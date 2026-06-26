@@ -23,6 +23,12 @@ importers:
       '@trillink/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@trillink/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      ggwave:
+        specifier: ^0.4.0
+        version: 0.4.0
     devDependencies:
       tsup:
         specifier: ^8.5.0
@@ -753,6 +759,9 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  ggwave@0.4.0:
+    resolution: {integrity: sha512-+sKq0aIEVJ7zHj4Vw+Sj/RPa91xp76ihaG5gsOKZ8ojM5+uUu3NFzAspozwBx/zeaThxP5VeIkA2bbsfWpUd2g==}
 
   glob@10.5.0:
     resolution: {integrity: sha512-DfXN8DfhJ7NH3Oe7cFmu3NCu1wKbkReJ8TorzSAFbSKrlNaQSKfIzqYqVY8zlbs2NLBbWpRiU52GX2PbaBVNkg==}
@@ -1665,6 +1674,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  ggwave@0.4.0: {}
 
   glob@10.5.0:
     dependencies:

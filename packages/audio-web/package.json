@@ -6,21 +6,25 @@
   "type": "module",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     }
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch"
   },
   "dependencies": {
-    "@trillink/protocol": "workspace:*"
+    "@trillink/protocol": "workspace:*",
+    "@trillink/sdk": "workspace:*",
+    "ggwave": "^0.4.0"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
