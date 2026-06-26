@@ -1,15 +1,16 @@
 import type { TrilinkMessage } from '@trillink/protocol';
 import { ContactType } from '@trillink/protocol';
-import { WebAudioAdapter, type AudioChannel } from '@trillink/audio-web';
+import { WebAudioAdapter, type ReliabilityMode } from '@trillink/audio-web';
 import { TrilinkSender } from '@trillink/sdk';
 
 /**
  * <trillink-sender> Web Component
  *
  * Attributes:
- *   channel   — "direct" | "voip" | "gsm" | "ptt"   (default: "voip")
- *   cycles    — number of transmission cycles          (default: 3)
- *   preamble  — preamble duration ms for PTT           (default: 700 for ptt, 0 otherwise)
+ *   mode      — "fast" | "balanced" | "robust"         (default: "balanced")
+ *   ptt       — presence enables 700 ms squelch-open preamble
+ *   cycles    — number of transmission cycles          (default: 1)
+ *   preamble  — override preamble duration ms
  *
  * Events dispatched on the element:
  *   trillink:sent    — detail: { messages: TrilinkMessage[] }
@@ -22,7 +23,7 @@ export class TrilinkSenderElement extends HTMLElement {
   private _sender: TrilinkSender | null = null;
 
   static get observedAttributes() {
-    return ['channel', 'cycles', 'preamble'];
+    return ['mode', 'ptt', 'cycles', 'preamble'];
   }
 
   connectedCallback() {
@@ -30,22 +31,26 @@ export class TrilinkSenderElement extends HTMLElement {
     this.render();
   }
 
-  private get channel(): AudioChannel {
-    return (this.getAttribute('channel') ?? 'voip') as AudioChannel;
+  private get mode(): ReliabilityMode {
+    return (this.getAttribute('mode') ?? 'balanced') as ReliabilityMode;
+  }
+
+  private get ptt(): boolean {
+    return this.hasAttribute('ptt');
   }
 
   private get cycles(): number {
-    return parseInt(this.getAttribute('cycles') ?? '3', 10);
+    return parseInt(this.getAttribute('cycles') ?? '1', 10);
   }
 
   private get preambleMs(): number {
     const attr = this.getAttribute('preamble');
     if (attr !== null) return parseInt(attr, 10);
-    return this.channel === 'ptt' ? 700 : 0;
+    return this.ptt ? 700 : 0;
   }
 
   async sendMessages(messages: { message: TrilinkMessage; cont?: boolean }[]): Promise<void> {
-    const adapter = new WebAudioAdapter({ channel: this.channel });
+    const adapter = new WebAudioAdapter({ mode: this.mode, ptt: this.ptt });
     this._sender = new TrilinkSender({
       audio: adapter,
       cycles: this.cycles,

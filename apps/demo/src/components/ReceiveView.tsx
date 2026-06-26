@@ -1,6 +1,6 @@
-import { useState, useRef } from 'preact/hooks';
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
-import { WebAudioAdapter, type AudioChannel } from '@trillink/audio-web';
+import { WebAudioAdapter } from '@trillink/audio-web';
 import { TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 
@@ -11,32 +11,50 @@ interface ReceivedEntry {
   ts: string;
 }
 
-export function ReceiveView() {
+interface Props {
+  autoStart?: boolean;
+  onStarted?: () => void;
+}
+
+const WATERFALL_W = 512;
+const WATERFALL_H = 160;
+
+export function ReceiveView({ autoStart, onStarted }: Props) {
   const [listening, setListening] = useState(false);
   const [signal, setSignal] = useState(false);
-  const [channel, setChannel] = useState<AudioChannel>('voip');
   const [log, setLog] = useState<ReceivedEntry[]>([]);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const rxRef = useRef<TrilinkReceiver | null>(null);
-  const idRef = useRef(0);
+  const [level, setLevel] = useState(0);
 
-  async function startListening() {
+  const rxRef = useRef<TrilinkReceiver | null>(null);
+  const adapterRef = useRef<WebAudioAdapter | null>(null);
+  const idRef = useRef(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
+  const signalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startListening = useCallback(async () => {
     setError('');
     setStatus('Starting…');
 
     try {
-      const adapter = new WebAudioAdapter({ channel });
+      const adapter = new WebAudioAdapter({ mode: 'balanced' });
+      adapterRef.current = adapter;
+
       const rx = new TrilinkReceiver({
         audio: adapter,
+        onLevel: (rms) => setLevel(rms),
         onEvent(e: ReceiverEvent) {
           if (e.type === 'listening') {
             setListening(true);
             setStatus('Listening…');
+            onStarted?.();
           } else if (e.type === 'signal-detected') {
             setSignal(true);
             setStatus('Signal detected…');
-            setTimeout(() => setSignal(false), 3000);
+            if (signalTimerRef.current) clearTimeout(signalTimerRef.current);
+            signalTimerRef.current = setTimeout(() => setSignal(false), 3000);
           } else if (e.type === 'fragment-received') {
             setStatus(`Fragment ${e.segIdx + 1}/${e.segTotal}…`);
           } else if (e.type === 'message-ready') {
@@ -60,32 +78,96 @@ export function ReceiveView() {
       setListening(false);
       setStatus('');
     }
-  }
+  }, [onStarted]);
 
   async function stopListening() {
+    cancelAnimationFrame(animRef.current);
     await rxRef.current?.stop();
     rxRef.current = null;
+    adapterRef.current = null;
     setListening(false);
     setSignal(false);
+    setLevel(0);
     setStatus('');
   }
+
+  // Auto-start when prop changes
+  useEffect(() => {
+    if (autoStart && !listening) {
+      void startListening();
+    }
+  }, [autoStart]);
+
+  // Waterfall animation loop
+  useEffect(() => {
+    if (!listening) {
+      cancelAnimationFrame(animRef.current);
+      // Clear canvas
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx?.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, WATERFALL_W, WATERFALL_H);
+
+    function draw() {
+      animRef.current = requestAnimationFrame(draw);
+
+      const analyser = adapterRef.current?.analyser;
+      if (!analyser || !canvas || !ctx) return;
+
+      const bufLen = analyser.frequencyBinCount;
+      const data = new Uint8Array(bufLen);
+      analyser.getByteFrequencyData(data);
+
+      // Show 0–5000 Hz range. At 48 kHz, fftSize=2048 → binWidth=23.4 Hz → 5000 Hz ≈ 213 bins.
+      // We use min(bufLen, 256) to stay in the audio-modem range.
+      const maxBin = Math.min(bufLen, 256);
+
+      // Shift existing image down 1 row
+      const existing = ctx.getImageData(0, 0, WATERFALL_W, WATERFALL_H - 1);
+      ctx.putImageData(existing, 0, 1);
+
+      // Draw new row at top
+      for (let x = 0; x < WATERFALL_W; x++) {
+        const binIdx = Math.floor(x * maxBin / WATERFALL_W);
+        const val = (data[binIdx] ?? 0) / 255;
+        // Color map: dark blue → cyan → green → yellow → white
+        const r = Math.floor(val < 0.5 ? 0 : (val - 0.5) * 2 * 255);
+        const g = Math.floor(val < 0.25 ? val * 4 * 180 : val < 0.75 ? 180 : 180 + (val - 0.75) * 4 * 75);
+        const b = Math.floor(val < 0.25 ? 80 + val * 4 * 175 : Math.max(0, 255 - (val - 0.25) * (255 / 0.75)));
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, 0, 1, 1);
+      }
+    }
+
+    animRef.current = requestAnimationFrame(draw);
+
+    return () => cancelAnimationFrame(animRef.current);
+  }, [listening]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      void rxRef.current?.stop();
+      cancelAnimationFrame(animRef.current);
+    };
+  }, []);
+
+  const vuWidth = Math.min(100, Math.round(level * 400));
 
   return (
     <div style={s.container}>
       <h2 style={s.heading}>Receive</h2>
-
-      <label style={s.label}>Channel</label>
-      <select
-        style={s.select}
-        value={channel}
-        disabled={listening}
-        onChange={(e) => setChannel((e.target as HTMLSelectElement).value as AudioChannel)}
-      >
-        <option value="direct">Direct (same room)</option>
-        <option value="voip">VoIP (Telegram, WhatsApp, Discord)</option>
-        <option value="gsm">GSM phone call</option>
-        <option value="ptt">PTT / Walkie-talkie</option>
-      </select>
 
       <div style={s.controls}>
         {!listening ? (
@@ -106,11 +188,41 @@ export function ReceiveView() {
 
       <div style={s.statusRow}>
         {listening && (
-          <span style={{ ...s.dot, background: signal ? 'var(--green)' : 'var(--accent)', animation: signal ? 'none' : 'pulse 1.5s infinite' }} />
+          <span
+            style={{
+              ...s.dot,
+              background: signal ? 'var(--green)' : 'var(--accent)',
+              animation: signal ? 'none' : 'pulse 1.5s infinite',
+            }}
+          />
         )}
         {status && <span style={s.statusText}>{status}</span>}
         {error && <span style={{ ...s.statusText, color: 'var(--red)' }}>{error}</span>}
       </div>
+
+      {listening && (
+        <div style={s.meters}>
+          <div style={s.vuTrack}>
+            <div
+              style={{
+                ...s.vuBar,
+                width: `${vuWidth}%`,
+                background: level > 0.3 ? (level > 0.7 ? 'var(--red)' : 'var(--green)') : 'var(--accent)',
+              }}
+            />
+          </div>
+          <canvas
+            ref={canvasRef}
+            width={WATERFALL_W}
+            height={WATERFALL_H}
+            style={s.waterfall}
+          />
+          <div style={s.waterfallLabel}>
+            <span style={s.freqLabel}>0 Hz</span>
+            <span style={s.freqLabel}>~5000 Hz</span>
+          </div>
+        </div>
+      )}
 
       <div style={s.log}>
         {log.length === 0 && !listening && (
@@ -188,17 +300,6 @@ function Row({ k, v }: { k: string; v: string }) {
 const s = {
   container: { display: 'flex', flexDirection: 'column' as const, gap: '16px' },
   heading: { fontSize: '20px', fontWeight: 600, marginBottom: '4px' },
-  label: { display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '6px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
-  select: {
-    width: '100%',
-    background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    color: 'var(--text)',
-    fontSize: '15px',
-    padding: '10px 12px',
-    outline: 'none',
-  },
   controls: { display: 'flex', gap: '8px' },
   btn: {
     flex: 1,
@@ -223,6 +324,25 @@ const s = {
   statusRow: { display: 'flex', alignItems: 'center', gap: '8px', minHeight: '20px' },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   statusText: { fontSize: '14px', color: 'var(--muted)' },
+  meters: { display: 'flex', flexDirection: 'column' as const, gap: '6px' },
+  vuTrack: {
+    height: '6px',
+    background: 'var(--surface)',
+    borderRadius: '3px',
+    overflow: 'hidden',
+    border: '1px solid var(--border)',
+  },
+  vuBar: { height: '100%', borderRadius: '3px', transition: 'width 40ms linear, background 100ms' },
+  waterfall: {
+    width: '100%',
+    height: `${WATERFALL_H}px`,
+    borderRadius: 'var(--radius)',
+    imageRendering: 'pixelated' as const,
+    display: 'block' as const,
+    background: '#0a0a0a',
+  },
+  waterfallLabel: { display: 'flex', justifyContent: 'space-between' },
+  freqLabel: { fontSize: '10px', color: 'var(--muted)' },
   log: { display: 'flex', flexDirection: 'column' as const, gap: '8px' },
   empty: { color: 'var(--muted)', fontSize: '14px', textAlign: 'center' as const, padding: '32px 0' },
   card: {

@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { SendView } from './components/SendView.js';
 import { ReceiveView } from './components/ReceiveView.js';
 
@@ -6,6 +6,14 @@ type Tab = 'send' | 'receive';
 
 export function App() {
   const [tab, setTab] = useState<Tab>('send');
+  const [autoStartReceive, setAutoStartReceive] = useState(false);
+
+  useEffect(() => {
+    if (location.hash === '#listen') {
+      setTab('receive');
+      setAutoStartReceive(true);
+    }
+  }, []);
 
   return (
     <div style={styles.root}>
@@ -31,7 +39,11 @@ export function App() {
       </header>
 
       <main style={styles.main}>
-        {tab === 'send' ? <SendView /> : <ReceiveView />}
+        {tab === 'send' ? (
+          <SendView />
+        ) : (
+          <ReceiveView autoStart={autoStartReceive} onStarted={() => setAutoStartReceive(false)} />
+        )}
       </main>
 
       <footer style={styles.footer}>

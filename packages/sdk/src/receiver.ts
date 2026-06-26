@@ -12,12 +12,14 @@ export interface ReceiverOptions {
   audio: AudioAdapter;
   fragmentTimeoutMs?: number;
   onEvent?: (e: ReceiverEvent) => void;
+  onLevel?: (rms: number) => void;
 }
 
 export class TrilinkReceiver {
   private readonly audio: AudioAdapter;
   private readonly fragmentTimeoutMs: number;
   private readonly onEvent: ((e: ReceiverEvent) => void) | undefined;
+  private readonly onLevel: ((rms: number) => void) | undefined;
   private readonly ctx = new SessionContext();
   private pruneTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -25,12 +27,14 @@ export class TrilinkReceiver {
     this.audio = opts.audio;
     this.fragmentTimeoutMs = opts.fragmentTimeoutMs ?? 30_000;
     this.onEvent = opts.onEvent;
+    this.onLevel = opts.onLevel;
   }
 
   async start(): Promise<void> {
     await this.audio.startListening(
       (frame) => this.handleFrame(frame),
       () => this.emit({ type: 'signal-detected' }),
+      this.onLevel,
     );
 
     this.pruneTimer = setInterval(() => {

@@ -1,5 +1,5 @@
 import type { TrilinkMessage } from '@trillink/protocol';
-import { WebAudioAdapter, type AudioChannel } from '@trillink/audio-web';
+import { WebAudioAdapter, type ReliabilityMode } from '@trillink/audio-web';
 import { TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 
@@ -7,7 +7,7 @@ import type { ReceiverEvent } from '@trillink/sdk';
  * <trillink-receiver> Web Component
  *
  * Attributes:
- *   channel     — "direct" | "voip" | "gsm" | "ptt"  (default: "voip")
+ *   mode        — "fast" | "balanced" | "robust"  (default: "balanced"); affects TX only, RX auto-detects
  *   auto-start  — start listening on connect (requires user gesture first on iOS)
  *
  * Events dispatched on the element (bubbles, composed):
@@ -21,7 +21,7 @@ export class TrilinkReceiverElement extends HTMLElement {
   private _listening = false;
 
   static get observedAttributes() {
-    return ['channel', 'auto-start'];
+    return ['mode', 'auto-start'];
   }
 
   connectedCallback() {
@@ -39,14 +39,14 @@ export class TrilinkReceiverElement extends HTMLElement {
     void this.stopListening();
   }
 
-  private get channel(): AudioChannel {
-    return (this.getAttribute('channel') ?? 'voip') as AudioChannel;
+  private get mode(): ReliabilityMode {
+    return (this.getAttribute('mode') ?? 'balanced') as ReliabilityMode;
   }
 
   async startListening(): Promise<void> {
     if (this._listening) return;
 
-    const adapter = new WebAudioAdapter({ channel: this.channel });
+    const adapter = new WebAudioAdapter({ mode: this.mode });
     this._receiver = new TrilinkReceiver({
       audio: adapter,
       onEvent: (e: ReceiverEvent) => this.handleEvent(e),
