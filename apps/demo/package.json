@@ -1,0 +1,22 @@
+{
+  "name": "demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@trillink/audio-web": "workspace:*",
+    "@trillink/protocol": "workspace:*",
+    "@trillink/sdk": "workspace:*",
+    "preact": "^10.26.9"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.9.5",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
