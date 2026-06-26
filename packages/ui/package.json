@@ -1,0 +1,31 @@
+{
+  "name": "@trillink/ui",
+  "version": "0.1.0",
+  "description": "Trillink Web Components for embedding in any web page",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "@trillink/audio-web": "workspace:*",
+    "@trillink/protocol": "workspace:*",
+    "@trillink/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  }
+}
