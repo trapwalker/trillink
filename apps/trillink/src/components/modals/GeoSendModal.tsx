@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
 import { parseCoord } from '@trillink/coord-parser';
-import { getLruCoords, pushLruCoord } from '../../store/index.js';
+import { getLruCoords, pushLruCoord, copyToClipboard } from '../../store/index.js';
 import { Modal }      from '../Modal.js';
 import { LeafletMap } from '../LeafletMap.js';
 
@@ -99,6 +99,15 @@ export function GeoSendModal({ onSend, onClose }: Props) {
               onFocus={() => setShowLru(lru.length > 0)}
               onBlur={() => setTimeout(() => setShowLru(false), 150)}
             />
+            {hasCoords && (
+              <button
+                style={s.locBtn}
+                onClick={() => copyToClipboard(`${lat!.toFixed(6)}, ${lon!.toFixed(6)}`)}
+                title="Copy coordinates"
+              >
+                📋
+              </button>
+            )}
             <button style={s.locBtn} onClick={locateMe} disabled={locating} title="Use my location">
               {locating ? '…' : '📍'}
             </button>

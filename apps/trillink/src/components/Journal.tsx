@@ -1,6 +1,6 @@
-import { journal, showToast, type JournalEntry } from '../store/index.js';
+import { journal, deleteEntry, copyToClipboard, type JournalEntry } from '../store/index.js';
 import { buildAllMapUrls } from '@trillink/map-providers';
-import type { TrilinkMessage, GeoMessage } from '@trillink/protocol';
+import type { TrilinkMessage, GeoMessage, ContactMessage } from '@trillink/protocol';
 
 interface Props {
   loading?: boolean;
@@ -39,46 +39,64 @@ export function Journal({ loading, onSelectEntry }: Props) {
 
 function EntryCard({ entry, onSelect }: { entry: JournalEntry; onSelect: (e: JournalEntry) => void }) {
   const isIn = entry.direction === 'in';
-  const ts = formatTs(entry.ts);
+  const msg  = entry.message;
+  const dirColor = isIn ? 'var(--accent)' : 'var(--green)';
+
+  function handleRowClick() {
+    if (msg.type === 'GEO') onSelect(entry);
+  }
 
   return (
-    <div
-      style={{
-        ...s.card,
-        borderLeft: `3px solid ${isIn ? 'var(--accent)' : 'var(--green)'}`,
-        cursor: entry.message.type === 'GEO' ? 'pointer' : 'default',
-      }}
-      onClick={() => onSelect(entry)}
-    >
-      <div style={s.cardHeader}>
-        <span style={{ ...s.dirIcon, color: isIn ? 'var(--accent)' : 'var(--green)' }}>
-          {isIn ? '◀' : '▶'}
+    <div style={{ ...s.card, borderLeft: `3px solid ${dirColor}` }}>
+      <div
+        style={{ ...s.row, cursor: msg.type === 'GEO' ? 'pointer' : 'default' }}
+        onClick={handleRowClick}
+      >
+        <span style={{ ...s.dir, color: dirColor }}>{isIn ? '◀' : '▶'}</span>
+        <span style={s.time}>{formatTs(entry.ts)}</span>
+        <span style={s.type}>{msg.type}</span>
+        <span style={s.colon}>:</span>
+        <span style={s.content} title={msg.type === 'GEO' ? 'Open on map' : undefined}>
+          <ContentText msg={msg} />
         </span>
-        <span style={s.msgType}>{entry.message.type}</span>
-        <span style={s.ts}>{ts}</span>
-        {entry.message.type === 'GEO' && (
-          <MapButtons lat={(entry.message as GeoMessage).lat} lon={(entry.message as GeoMessage).lon} />
-        )}
+        <div style={s.actions} onClick={(e) => e.stopPropagation()}>
+          {msg.type === 'GEO' && <MapLinks lat={(msg as GeoMessage).lat} lon={(msg as GeoMessage).lon} />}
+          {msg.type === 'CONTACT' && <CallBtn value={(msg as ContactMessage).value} />}
+          <ActionBtn title="Copy" onClick={() => copyToClipboard(getClipText(msg))}>📋</ActionBtn>
+          <ActionBtn title="Delete" onClick={() => deleteEntry(entry.id)}>🗑</ActionBtn>
+        </div>
       </div>
 
-      <div style={s.cardBody}>
-        <MessageSummary msg={entry.message} />
-        {entry.continuations.map((c) => (
-          <div key={c.id} style={s.continuation}>
-            <span style={s.contIcon}>📎</span>
-            <MessageSummary msg={c.message} compact />
-          </div>
-        ))}
-      </div>
+      {entry.continuations.map((c) => (
+        <div key={c.id} style={s.contRow}>
+          <span style={s.contIcon}>📎</span>
+          <span style={s.type}>{c.message.type}</span>
+          <span style={s.colon}>:</span>
+          <span style={s.content}><ContentText msg={c.message} /></span>
+        </div>
+      ))}
     </div>
   );
 }
 
-function MapButtons({ lat, lon }: { lat: number; lon: number }) {
+function ActionBtn({ title, onClick, children }: { title: string; onClick: () => void; children: string }) {
+  return (
+    <button style={s.actionBtn} title={title} onClick={onClick}>{children}</button>
+  );
+}
+
+function CallBtn({ value }: { value: string }) {
+  const href = value.startsWith('+') || /^\d/.test(value) ? `tel:${value}` : undefined;
+  if (!href) return null;
+  return (
+    <a href={href} style={s.actionBtn} title="Call" onClick={(e) => e.stopPropagation()}>📞</a>
+  );
+}
+
+function MapLinks({ lat, lon }: { lat: number; lon: number }) {
   const urls = buildAllMapUrls(lat, lon);
   return (
-    <div style={s.mapBtns} onClick={(e) => e.stopPropagation()}>
-      <CopyBtn text={`${lat.toFixed(6)}, ${lon.toFixed(6)}`} />
+    <>
       {urls.map(({ provider, url }) => (
         <a
           key={provider.id}
@@ -87,54 +105,50 @@ function MapButtons({ lat, lon }: { lat: number; lon: number }) {
           rel="noopener noreferrer"
           style={s.mapLink}
           title={`Open in ${provider.name}`}
+          onClick={(e) => e.stopPropagation()}
         >
           {provider.label}
         </a>
       ))}
-    </div>
+    </>
   );
 }
 
-function CopyBtn({ text }: { text: string }) {
-  function copy(e: Event) {
-    e.stopPropagation();
-    navigator.clipboard?.writeText(text)
-      .then(() => showToast('Copied!'))
-      .catch(() => {});
-  }
-  return (
-    <button style={s.copyBtn} onClick={copy} title="Copy coordinates">
-      📋
-    </button>
-  );
-}
-
-function MessageSummary({ msg, compact = false }: { msg: TrilinkMessage; compact?: boolean }) {
+function ContentText({ msg }: { msg: TrilinkMessage }) {
   switch (msg.type) {
     case 'GEO':
       return (
-        <span style={compact ? s.compactText : s.geoCoords}>
+        <span style={s.mono}>
           {fmtCoord(msg.lat, 'NS')}{' '}{fmtCoord(msg.lon, 'EW')}
           {msg.alt !== undefined ? ` · ${msg.alt} m` : ''}
         </span>
       );
     case 'CONTACT':
-      return <span style={compact ? s.compactText : s.bodyText}>{msg.value}</span>;
+      return <span>{msg.value}</span>;
     case 'TEXT':
-      return <span style={compact ? s.compactText : s.bodyText}>«{msg.text}»</span>;
+      return <span>«{msg.text}»</span>;
     case 'TIME': {
       const d = new Date(msg.unixTs * 1000);
-      return <span style={compact ? s.compactText : s.bodyText}>{d.toISOString().replace('T', ' ').slice(0, 16)} UTC</span>;
+      return <span style={s.mono}>{d.toISOString().replace('T', ' ').slice(0, 16)} UTC</span>;
     }
     default:
-      return <span style={s.compactText}>{msg.type}</span>;
+      return <span style={{ color: 'var(--muted)' }}>{(msg as TrilinkMessage).type}</span>;
+  }
+}
+
+function getClipText(msg: TrilinkMessage): string {
+  switch (msg.type) {
+    case 'GEO':      return `${msg.lat.toFixed(6)}, ${msg.lon.toFixed(6)}${msg.alt !== undefined ? ` alt:${msg.alt}m` : ''}`;
+    case 'CONTACT':  return msg.value;
+    case 'TEXT':     return msg.text;
+    case 'TIME':     return new Date(msg.unixTs * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    default:         return msg.type;
   }
 }
 
 function fmtCoord(deg: number, hems: string): string {
   const [pos, neg] = hems.split('');
-  const hem = deg >= 0 ? pos : neg;
-  return `${Math.abs(deg).toFixed(4)}°${hem}`;
+  return `${Math.abs(deg).toFixed(4)}°${deg >= 0 ? pos : neg}`;
 }
 
 function formatTs(d: Date): string {
@@ -144,11 +158,12 @@ function formatTs(d: Date): string {
 const s = {
   container: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto' as const,
-    padding: '8px 12px',
+    padding: '6px 10px',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '6px',
+    gap: '4px',
   },
   empty: {
     display: 'flex',
@@ -166,46 +181,57 @@ const s = {
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius)',
     overflow: 'hidden',
+    flexShrink: 0,
   },
-  cardHeader: {
+  row: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '6px 10px',
-    borderBottom: '1px solid var(--border)',
-    flexWrap: 'wrap' as const,
+    gap: '5px',
+    padding: '5px 8px',
+    minWidth: 0,
   },
-  dirIcon: { fontSize: '12px', fontWeight: 700 },
-  msgType: { fontFamily: 'var(--font)', fontSize: '11px', fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.05em' },
-  ts: { fontSize: '11px', color: 'var(--muted)', marginLeft: '2px' },
-  mapBtns: { display: 'flex', gap: '4px', marginLeft: 'auto', alignItems: 'center' },
+  contRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    padding: '2px 8px 5px 24px',
+    minWidth: 0,
+  },
+  dir: { fontSize: '10px', fontWeight: 700, flexShrink: 0 },
+  time: { fontSize: '11px', color: 'var(--muted)', flexShrink: 0, fontFamily: 'var(--font)' },
+  type: { fontSize: '11px', fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.04em', flexShrink: 0 },
+  colon: { fontSize: '11px', color: 'var(--muted)', flexShrink: 0 },
+  content: { fontSize: '13px', color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
+  mono: { fontFamily: 'var(--font)' },
+  contIcon: { fontSize: '10px', flexShrink: 0 },
+  actions: { display: 'flex', alignItems: 'center', gap: '2px', marginLeft: 'auto', flexShrink: 0 },
+  actionBtn: {
+    background: 'none',
+    border: 'none',
+    borderRadius: '4px',
+    color: 'var(--muted)',
+    cursor: 'pointer',
+    fontSize: '12px',
+    lineHeight: 1,
+    padding: '3px 4px',
+    textDecoration: 'none',
+    display: 'inline-flex',
+    alignItems: 'center',
+  },
   mapLink: {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     background: 'var(--border)',
-    borderRadius: '4px',
+    borderRadius: '3px',
     color: 'var(--text)',
-    fontSize: '10px',
+    fontSize: '9px',
     fontWeight: 700,
-    height: '20px',
-    minWidth: '22px',
-    padding: '0 4px',
+    height: '18px',
+    minWidth: '20px',
+    padding: '0 3px',
     textDecoration: 'none',
     fontFamily: 'var(--font)',
+    letterSpacing: '0.02em',
   },
-  copyBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: '12px',
-    padding: '0 2px',
-    lineHeight: 1,
-  },
-  cardBody: { padding: '6px 10px', display: 'flex', flexDirection: 'column' as const, gap: '4px' },
-  geoCoords: { fontFamily: 'var(--font)', fontSize: '14px', color: 'var(--text)', letterSpacing: '0.03em' },
-  bodyText: { fontSize: '14px', color: 'var(--text)' },
-  compactText: { fontSize: '12px', color: 'var(--muted)' },
-  continuation: { display: 'flex', gap: '6px', alignItems: 'baseline' },
-  contIcon: { fontSize: '11px' },
 } as const;

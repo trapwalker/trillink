@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
+import { copyToClipboard } from '../../store/index.js';
 import { Modal } from '../Modal.js';
 
 interface Props {
@@ -63,7 +64,10 @@ export function TimeSendModal({ onSend, onClose }: Props) {
           />
         )}
 
-        <div style={s.preview}>{preview} UTC</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ ...s.preview, flex: 1 }}>{preview} UTC</div>
+          <button style={s.iconBtn} onClick={() => copyToClipboard(preview + ' UTC')} title="Copy time">📋</button>
+        </div>
       </div>
     </Modal>
   );
@@ -93,6 +97,11 @@ const s = {
     background: 'var(--surface)', border: '1px solid var(--border)',
     borderRadius: 'var(--radius)', color: 'var(--muted)',
     cursor: 'pointer', fontSize: '14px', padding: '8px 16px',
+  },
+  iconBtn: {
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)', color: 'var(--muted)',
+    cursor: 'pointer', fontSize: '16px', padding: '8px 10px', flexShrink: 0,
   },
   send: {
     background: 'var(--accent)', border: 'none',

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
 import { ContactType } from '@trillink/protocol';
+import { copyToClipboard } from '../../store/index.js';
 import { Modal } from '../Modal.js';
 
 const LRU_KEY = 'trillink:contact-lru';
@@ -80,14 +81,19 @@ export function ContactSendModal({ onSend, onClose }: Props) {
           ))}
         </div>
 
-        <input
-          style={s.input}
-          type="text"
-          placeholder={placeholder[type]}
-          value={value}
-          autoFocus
-          onInput={(e) => { setValue((e.target as HTMLInputElement).value); setError(''); }}
-        />
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input
+            style={{ ...s.input, flex: 1 }}
+            type="text"
+            placeholder={placeholder[type]}
+            value={value}
+            autoFocus
+            onInput={(e) => { setValue((e.target as HTMLInputElement).value); setError(''); }}
+          />
+          {value && (
+            <button style={s.iconBtn} onClick={() => copyToClipboard(value)} title="Copy">📋</button>
+          )}
+        </div>
 
         {lru.length > 0 && (
           <div style={s.lru}>
@@ -130,6 +136,11 @@ const s = {
     padding: '5px 8px', textAlign: 'left' as const,
   },
   error: { fontSize: '13px', color: 'var(--red)' },
+  iconBtn: {
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)', color: 'var(--muted)',
+    cursor: 'pointer', fontSize: '16px', padding: '0 10px', flexShrink: 0,
+  },
   cancel: {
     background: 'var(--surface)', border: '1px solid var(--border)',
     borderRadius: 'var(--radius)', color: 'var(--muted)',

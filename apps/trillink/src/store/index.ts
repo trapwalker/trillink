@@ -1,6 +1,6 @@
 import { signal } from '@preact/signals';
 import type { TrilinkMessage } from '@trillink/protocol';
-import { persistEntry, loadJournal } from './db.js';
+import { persistEntry, loadJournal, deleteEntries } from './db.js';
 
 // ── Journal ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,13 @@ loadJournal().then((entries) => {
   journalLoaded.value = true;
 }).catch(() => { journalLoaded.value = true; });
 
+export function deleteEntry(id: number): void {
+  const entry = journal.value.find((e) => e.id === id);
+  if (!entry) return;
+  journal.value = journal.value.filter((e) => e.id !== id);
+  void deleteEntries([id, ...entry.continuations.map((c) => c.id)]);
+}
+
 export function addEntry(entry: JournalEntry): void {
   // CONT messages get attached to the primary message of the same session.
   if (entry.isCont && entry.direction === 'in' && entry.sessionId !== 0) {
@@ -56,6 +63,7 @@ export function addEntry(entry: JournalEntry): void {
 export const isListening      = signal(false);
 export const audioLevel       = signal(0);
 export const showWaterfall    = signal(true);
+export const panelView        = signal<'waterfall' | 'map'>('waterfall');
 export const isSending        = signal(false);
 export const sendProgress     = signal('');
 export const signalDetected   = signal(false);
@@ -68,7 +76,8 @@ export type ModalState =
   | { type: 'geo-detail'; entry: JournalEntry }
   | { type: 'contact-send' }
   | { type: 'text-send' }
-  | { type: 'time-send' };
+  | { type: 'time-send' }
+  | { type: 'qr' };
 
 export const modal = signal<ModalState>({ type: 'none' });
 
@@ -96,6 +105,31 @@ export function pushLruCoord(c: LruCoord): void {
 
 export const toast = signal('');
 let _toastTimer = 0;
+
+export function copyToClipboard(text: string): void {
+  const write = (t: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(t)
+        .then(() => showToast('Copied!'))
+        .catch(() => legacyCopy(t));
+    } else {
+      legacyCopy(t);
+    }
+  };
+  write(text);
+}
+
+function legacyCopy(text: string): void {
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  try { document.execCommand('copy'); showToast('Copied!'); }
+  catch { showToast('Copy failed'); }
+  document.body.removeChild(el);
+}
 
 export function showToast(msg: string, durationMs = 1800): void {
   toast.value = msg;

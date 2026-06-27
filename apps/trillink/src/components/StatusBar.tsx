@@ -1,4 +1,4 @@
-import { isListening, audioLevel, signalDetected, isSending, sendProgress } from '../store/index.js';
+import { isListening, audioLevel, signalDetected, isSending, sendProgress, showWaterfall, panelView } from '../store/index.js';
 
 interface Props {
   onStartListening: () => void;
@@ -31,7 +31,16 @@ export function StatusBar({ onStartListening, onStopListening }: Props) {
               animation: signal ? 'none' : 'pulse 1.5s infinite',
             }}
           />
-          <div style={s.vuTrack}>
+          <div
+            style={{
+              ...s.vuTrack,
+              cursor: panelView.value === 'waterfall' ? 'pointer' : 'default',
+            }}
+            title={panelView.value === 'waterfall' ? (showWaterfall.value ? 'Hide waterfall' : 'Show waterfall') : undefined}
+            onClick={() => {
+              if (panelView.value === 'waterfall') showWaterfall.value = !showWaterfall.value;
+            }}
+          >
             <div
               style={{
                 ...s.vuBar,

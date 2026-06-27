@@ -6,17 +6,19 @@ import type { ReceiverEvent } from '@trillink/sdk';
 import {
   addEntry, nextEntryId, isListening, audioLevel, signalDetected,
   isSending, sendProgress, modal, closeModal, openModal, pttEnabled,
-  journal, journalLoaded, toast, showToast,
+  journal, journalLoaded, toast, showToast, panelView,
 } from './store/index.js';
 import { Toolbar }          from './components/Toolbar.js';
 import { Journal }          from './components/Journal.js';
 import { StatusBar }        from './components/StatusBar.js';
 import { WaterfallPanel }   from './components/WaterfallPanel.js';
+import { MapPanel }         from './components/MapPanel.js';
 import { GeoSendModal }     from './components/modals/GeoSendModal.js';
 import { GeoDetailModal }   from './components/modals/GeoDetailModal.js';
 import { ContactSendModal } from './components/modals/ContactSendModal.js';
 import { TextSendModal }    from './components/modals/TextSendModal.js';
 import { TimeSendModal }    from './components/modals/TimeSendModal.js';
+import { QrModal }          from './components/modals/QrModal.js';
 
 export function App() {
   const rxRef       = useRef<TrilinkReceiver | null>(null);
@@ -144,6 +146,11 @@ export function App() {
     <div style={s.root}>
       <Toolbar onSend={sendMessage} />
       <WaterfallPanel analyserRef={analyserRef} />
+      {panelView.value === 'map' && (
+        <MapPanel onSelectEntry={(entry) => {
+          if (entry.message.type === 'GEO') openModal({ type: 'geo-detail', entry });
+        }} />
+      )}
       <StatusBar onStartListening={startListening} onStopListening={stopListening} />
       <Journal
         loading={!journalLoaded.value}
@@ -157,6 +164,7 @@ export function App() {
       {m.type === 'contact-send' && <ContactSendModal onSend={sendMessage} onClose={closeModal} />}
       {m.type === 'text-send'    && <TextSendModal onSend={sendMessage} onClose={closeModal} />}
       {m.type === 'time-send'    && <TimeSendModal onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'qr'           && <QrModal onClose={closeModal} />}
 
       {toast.value && (
         <div style={s.toast}>{toast.value}</div>

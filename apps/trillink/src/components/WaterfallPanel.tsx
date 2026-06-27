@@ -1,17 +1,15 @@
 import { useEffect, useRef } from 'preact/hooks';
 import type { RefObject } from 'preact';
-import { showWaterfall, isListening } from '../store/index.js';
+import { showWaterfall, isListening, panelView } from '../store/index.js';
 
-// DTMF-FSK tone range for overlay markers
-const SYNC_HZ      = 500;
-const DATA_LO_HZ   = 700;
-const DATA_HI_HZ   = 2200;
+// DTMF-FSK tone range
+const SYNC_HZ    = 500;
+const DATA_LO_HZ = 700;
+const DATA_HI_HZ = 2200;
+const MAX_HZ     = 6000;
 
 const W = 512;
 const H = 120;
-
-// Show 0–6000 Hz in the waterfall (covers full FSK band + margin)
-const MAX_DISPLAY_HZ = 6000;
 
 interface Props {
   analyserRef: RefObject<AnalyserNode | null>;
@@ -22,38 +20,41 @@ export function WaterfallPanel({ analyserRef }: Props) {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const rafRef     = useRef<number>(0);
 
-  // Draw static overlay: FSK band markers (drawn once on mount)
+  function hzToX(hz: number) { return Math.round(hz / MAX_HZ * W); }
+
+  // Draw static overlay once on mount
   useEffect(() => {
     const ov = overlayRef.current;
     const oc = ov?.getContext('2d');
     if (!ov || !oc) return;
     oc.clearRect(0, 0, W, 20);
 
-    function hzToX(hz: number) { return Math.round(hz / MAX_DISPLAY_HZ * W); }
-
-    // FSK data band tint
-    oc.fillStyle = 'rgba(79, 142, 247, 0.10)';
+    // Data band tint
+    oc.fillStyle = 'rgba(79, 142, 247, 0.12)';
     oc.fillRect(hzToX(DATA_LO_HZ), 0, hzToX(DATA_HI_HZ) - hzToX(DATA_LO_HZ), 20);
 
-    // Sync tone marker
-    const sx = hzToX(SYNC_HZ);
-    oc.strokeStyle = 'rgba(61, 220, 132, 0.6)';
+    // Sync tone line (green)
+    oc.strokeStyle = 'rgba(61, 220, 132, 0.7)';
     oc.lineWidth = 1;
     oc.setLineDash([2, 3]);
+    const sx = hzToX(SYNC_HZ);
     oc.beginPath(); oc.moveTo(sx, 0); oc.lineTo(sx, 20); oc.stroke();
 
-    // Data band edges
-    oc.strokeStyle = 'rgba(79, 142, 247, 0.5)';
-    oc.setLineDash([2, 3]);
+    // Data band edge lines (blue)
+    oc.strokeStyle = 'rgba(79, 142, 247, 0.6)';
     for (const hz of [DATA_LO_HZ, DATA_HI_HZ]) {
       const x = hzToX(hz);
       oc.beginPath(); oc.moveTo(x, 0); oc.lineTo(x, 20); oc.stroke();
     }
   }, []);
 
+  // Animation loop
   useEffect(() => {
-    if (!showWaterfall.value || !isListening.value) {
-      cancelAnimationFrame(rafRef.current);
+    const active = showWaterfall.value && isListening.value && panelView.value === 'waterfall';
+
+    cancelAnimationFrame(rafRef.current);
+
+    if (!active) {
       const cv = canvasRef.current;
       if (cv) cv.getContext('2d')?.clearRect(0, 0, W, H);
       return;
@@ -71,10 +72,8 @@ export function WaterfallPanel({ analyserRef }: Props) {
       const analyser = analyserRef.current;
       if (!analyser || !canvas || !ctx) return;
 
-      const sampleRate = analyser.context.sampleRate;
-      const hzPerBin   = sampleRate / (analyser.fftSize);
-      // How many bins to show MAX_DISPLAY_HZ
-      const maxBin = Math.min(analyser.frequencyBinCount, Math.ceil(MAX_DISPLAY_HZ / hzPerBin));
+      const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
+      const maxBin   = Math.min(analyser.frequencyBinCount, Math.ceil(MAX_HZ / hzPerBin));
 
       const data = new Uint8Array(analyser.frequencyBinCount);
       analyser.getByteFrequencyData(data);
@@ -83,11 +82,10 @@ export function WaterfallPanel({ analyserRef }: Props) {
       ctx.putImageData(existing, 0, 1);
 
       for (let x = 0; x < W; x++) {
-        const binIdx = Math.floor(x * maxBin / W);
-        const val = (data[binIdx] ?? 0) / 255;
-        const r = Math.floor(val < 0.5 ? 0 : (val - 0.5) * 2 * 255);
-        const g = Math.floor(val < 0.25 ? val * 4 * 180 : val < 0.75 ? 180 : 180 + (val - 0.75) * 4 * 75);
-        const b = Math.floor(val < 0.25 ? 80 + val * 4 * 175 : Math.max(0, 255 - (val - 0.25) * (255 / 0.75)));
+        const v = (data[Math.floor(x * maxBin / W)] ?? 0) / 255;
+        const r = Math.floor(v < 0.5 ? 0 : (v - 0.5) * 2 * 255);
+        const g = Math.floor(v < 0.25 ? v * 4 * 180 : v < 0.75 ? 180 : 180 + (v - 0.75) * 4 * 75);
+        const b = Math.floor(v < 0.25 ? 80 + v * 4 * 175 : Math.max(0, 255 - (v - 0.25) * (255 / 0.75)));
         ctx.fillStyle = `rgb(${r},${g},${b})`;
         ctx.fillRect(x, 0, 1, 1);
       }
@@ -95,23 +93,22 @@ export function WaterfallPanel({ analyserRef }: Props) {
 
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [showWaterfall.value, isListening.value]);
+  }, [showWaterfall.value, isListening.value, panelView.value]);
 
-  if (!showWaterfall.value) return null;
+  if (panelView.value !== 'waterfall' || !showWaterfall.value) return null;
 
-  function hzToPercent(hz: number) { return `${(hz / MAX_DISPLAY_HZ * 100).toFixed(1)}%`; }
+  function pct(hz: number) { return `${(hz / MAX_HZ * 100).toFixed(1)}%`; }
 
   return (
     <div style={s.container}>
       <canvas ref={canvasRef} width={W} height={H} style={s.canvas} />
-      {/* Frequency axis with FSK band markers */}
       <div style={s.axis}>
         <canvas ref={overlayRef} width={W} height={20} style={s.overlay} />
         <span style={{ ...s.lbl, left: '0' }}>0</span>
-        <span style={{ ...s.lbl, left: hzToPercent(SYNC_HZ) }} title="SYNC 500 Hz">↑S</span>
-        <span style={{ ...s.lbl, left: hzToPercent(DATA_LO_HZ) }} title="Data 700–2200 Hz">↑D</span>
-        <span style={{ ...s.lbl, left: hzToPercent(DATA_HI_HZ) }} title="Data end 2200 Hz">↑</span>
-        <span style={{ ...s.lbl, left: hzToPercent(3000) }}>3k</span>
+        <span style={{ ...s.lbl, left: pct(SYNC_HZ),    color: 'rgba(61,220,132,0.8)' }} title="SYNC 500 Hz">S</span>
+        <span style={{ ...s.lbl, left: pct(DATA_LO_HZ), color: 'rgba(79,142,247,0.8)' }} title="Data band start 700 Hz">700</span>
+        <span style={{ ...s.lbl, left: pct(DATA_HI_HZ), color: 'rgba(79,142,247,0.8)' }} title="Data band end 2200 Hz">2.2k</span>
+        <span style={{ ...s.lbl, left: pct(3000) }}>3k</span>
         <span style={{ ...s.lbl, right: '0' }}>6k Hz</span>
       </div>
     </div>
@@ -126,11 +123,7 @@ const s = {
     imageRendering: 'pixelated' as const,
     display: 'block',
   },
-  axis: {
-    position: 'relative' as const,
-    height: '20px',
-    overflow: 'hidden',
-  },
+  axis: { position: 'relative' as const, height: '20px', overflow: 'hidden' },
   overlay: {
     position: 'absolute' as const,
     top: 0, left: 0,
@@ -145,5 +138,6 @@ const s = {
     top: '4px',
     transform: 'translateX(-50%)',
     userSelect: 'none' as const,
+    pointerEvents: 'none' as const,
   },
 } as const;

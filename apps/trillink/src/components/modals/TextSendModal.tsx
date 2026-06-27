@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
 import { MAX_PAYLOAD } from '@trillink/protocol';
+import { copyToClipboard } from '../../store/index.js';
 import { Modal } from '../Modal.js';
 
 // TEXT payload: 1 byte encoding prefix + text bytes. Limit single-frame ASCII.
@@ -57,7 +58,12 @@ export function TextSendModal({ onSend, onClose }: Props) {
           <span style={{ color: warn ? 'var(--red)' : 'var(--muted)', fontSize: '12px' }}>
             {len} bytes{warn ? ` — will fragment into ${Math.ceil(len / MAX_PAYLOAD)} frames` : ''}
           </span>
-          <span style={s.hint}>⌘↵ to send</span>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {text && (
+              <button style={s.iconBtn} onClick={() => copyToClipboard(text)} title="Copy text">📋</button>
+            )}
+            <span style={s.hint}>⌘↵ to send</span>
+          </div>
         </div>
         {error && <div style={s.error}>{error}</div>}
       </div>
@@ -75,6 +81,10 @@ const s = {
   },
   row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   hint: { fontSize: '12px', color: 'var(--muted)' },
+  iconBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: '14px', padding: '2px 4px', color: 'var(--muted)',
+  },
   error: { fontSize: '13px', color: 'var(--red)' },
   cancel: {
     background: 'var(--surface)', border: '1px solid var(--border)',

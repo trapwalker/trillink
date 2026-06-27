@@ -105,6 +105,14 @@ export async function loadJournal(): Promise<JournalEntry[]> {
   return primary;
 }
 
+export async function deleteEntries(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const db = await getDb();
+  const tx = db.transaction('journal', 'readwrite');
+  await Promise.all(ids.map((id) => tx.store.delete(id)));
+  await tx.done;
+}
+
 export async function clearJournal(): Promise<void> {
   const db = await getDb();
   await db.clear('journal');
