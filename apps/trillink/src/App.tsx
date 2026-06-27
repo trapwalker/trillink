@@ -31,7 +31,6 @@ export function App() {
     try {
       const adapter = new WebAudioAdapter();
       adapterRef.current = adapter;
-      analyserRef.current = adapter.analyser ?? null;
 
       const rx = new TrilinkReceiver({
         audio: adapter,
@@ -58,6 +57,8 @@ export function App() {
       });
       rxRef.current = rx;
       await rx.start();
+      // analyser is only available after startListening completes (RxHandle is created inside)
+      analyserRef.current = adapter.analyser;
     } catch {
       isListening.value = false;
     }

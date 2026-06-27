@@ -68,10 +68,10 @@ export class DtmfFskCodec implements AudioCodec {
     analyser.fftSize = 2048;
     source.connect(analyser);
 
-    // ScriptProcessorNode gives us sample-level access. 256 is the smallest
-    // allowed buffer; we accumulate to full symbol blocks internally.
+    // ScriptProcessorNode gives us sample-level access. 2048 samples (≈42 ms)
+    // is a reliable buffer size; we accumulate to Goertzel windows internally.
     // eslint-disable-next-line deprecation/deprecation
-    const proc = ctx.createScriptProcessor(256, 1, 1);
+    const proc = ctx.createScriptProcessor(2048, 1, 1);
     analyser.connect(proc);
     const mute = ctx.createGain();
     mute.gain.value = 0;
