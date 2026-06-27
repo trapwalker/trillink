@@ -57,6 +57,7 @@ export function encodeMessage(msg: TrilinkMessage, opts: EncodeOptions = {}): Tr
       msgType,
       segIdx: 0,
       segTot: 0,
+      sessionId: 0,  // caller (buildSession) sets the real session ID
       payload: fullPayload,
       crc: 0,
     }];
@@ -80,6 +81,7 @@ export function encodeMessage(msg: TrilinkMessage, opts: EncodeOptions = {}): Tr
     msgType,
     segIdx: i,
     segTot: chunks.length,
+    sessionId: 0,  // caller (buildSession) sets the real session ID
     payload: chunk,
     crc: 0,
   }));

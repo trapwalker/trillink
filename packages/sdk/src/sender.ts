@@ -97,12 +97,17 @@ export class TrilinkSender {
 
   /**
    * Estimate total transmission duration in seconds for the given messages.
-   * Calibrated empirically at 48 kHz against ggwave@0.4.0.
-   * All AUDIBLE_* protocols produce identical output length in this library version.
+   * Pass frameDuration to use your codec's estimate; it receives the encoded
+   * frame byte count and returns seconds for that one frame.
    */
   static estimateDuration(
     messages: SessionMessage[],
-    opts: { cycles?: number; interCycleGapMs?: number; interFrameGapMs?: number },
+    opts: {
+      cycles?: number;
+      interCycleGapMs?: number;
+      interFrameGapMs?: number;
+      frameDuration: (frameBytes: number) => number;
+    },
   ): number {
     const frames = buildSession(messages);
     const cycles = opts.cycles ?? 1;
@@ -110,7 +115,7 @@ export class TrilinkSender {
     const interFrameGapMs = opts.interFrameGapMs ?? 200;
 
     const framesSec = frames.reduce((sum, f) => {
-      return sum + ggwaveFrameDurationSec(encodeFrame(f).length);
+      return sum + opts.frameDuration(encodeFrame(f).length);
     }, 0);
     const gapsSec = (frames.length - 1) * (interFrameGapMs / 1000);
     const cycleSec = framesSec + gapsSec;
@@ -133,19 +138,3 @@ export class TrilinkSender {
   }
 }
 
-/**
- * Empirical ggwave@0.4.0 frame duration table at 48 kHz (GGWAVE_SAMPLE_FORMAT_F32).
- * Steps follow Reed-Solomon block boundaries. Max trillink frame = 28 bytes.
- */
-function ggwaveFrameDurationSec(frameBytes: number): number {
-  if (frameBytes <= 1)  return 1.067;
-  if (frameBytes <= 2)  return 1.259;
-  if (frameBytes <= 4)  return 1.451;
-  if (frameBytes <= 8)  return 1.643;
-  if (frameBytes <= 12) return 2.027;
-  if (frameBytes <= 18) return 2.411;
-  if (frameBytes <= 22) return 2.795;
-  if (frameBytes <= 24) return 2.987;
-  if (frameBytes <= 26) return 3.179;
-  return 3.371; // 27-28 bytes
-}

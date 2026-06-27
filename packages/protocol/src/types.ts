@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 1 as const;
-export const MAX_PAYLOAD = 22 as const;
+export const MAX_PAYLOAD = 20 as const;  // 28 max frame − 6 header − 2 CRC
 export const MAX_SEGMENTS = 15 as const;
 export const ALT_ABSENT = 0x7fff as const;
 export const COORD_ABSENT = 0x7fffffff as const;
@@ -55,6 +55,7 @@ export interface TrilinkFrame {
   msgType: MessageType;
   segIdx: number;
   segTot: number;
+  sessionId: number;  // uint16; groups frames of one logical transmission; 0 = unset
   payload: Uint8Array;
   crc: number;
 }

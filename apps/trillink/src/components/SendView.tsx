@@ -1,16 +1,17 @@
 import { useState, useRef, useMemo } from 'preact/hooks';
 import type { TrilinkMessage, TrilinkFrame } from '@trillink/protocol';
 import { ContactType, encodeMessage, encodeFrame } from '@trillink/protocol';
-import { WebAudioAdapter, type ReliabilityMode } from '@trillink/audio-web';
+import { WebAudioAdapter, DtmfFskCodec } from '@trillink/audio-web';
 import { TrilinkSender } from '@trillink/sdk';
 import type { SenderEvent } from '@trillink/sdk';
 
 type MsgType = 'GEO' | 'CONTACT' | 'TEXT' | 'TIME';
 type SendState = 'idle' | 'sending' | 'done' | 'error';
 
+const _codec = new DtmfFskCodec();
+
 export function SendView() {
   const [msgType, setMsgType] = useState<MsgType>('GEO');
-  const [mode, setMode] = useState<ReliabilityMode>('balanced');
   const [ptt, setPtt] = useState(false);
   const [cycles, setCycles] = useState(1);
   const [state, setState] = useState<SendState>('idle');
@@ -63,9 +64,9 @@ export function SendView() {
     if (!messageForPreview) return null;
     return TrilinkSender.estimateDuration(
       [{ message: messageForPreview }],
-      { mode, cycles, interCycleGapMs: 1500 },
+      { cycles, interCycleGapMs: 1500, frameDuration: (b) => _codec.estimateDuration(b) },
     );
-  }, [messageForPreview, mode, cycles]);
+  }, [messageForPreview, cycles]);
 
   const debugFrames = useMemo<TrilinkFrame[] | null>(() => {
     if (!messageForPreview) return null;
@@ -86,7 +87,7 @@ export function SendView() {
     setProgress('Initializing…');
 
     try {
-      const adapter = new WebAudioAdapter({ mode, ptt, volume: 10 });
+      const adapter = new WebAudioAdapter({ ptt, volume: 60 });
       const sender = new TrilinkSender({
         audio: adapter,
         cycles,
@@ -165,25 +166,6 @@ export function SendView() {
         {msgType === 'TIME' && (
           <p style={s.hint}>Sends current device time with UTC offset.</p>
         )}
-      </div>
-
-      <label style={s.label}>Reliability</label>
-      <div style={s.modeRow}>
-        {([
-          ['fast', 'Fast', 'Direct / VoIP'],
-          ['balanced', 'Balanced', 'GSM call'],
-          ['robust', 'Robust', 'PTT radio'],
-        ] as [ReliabilityMode, string, string][]).map(([m, label, hint]) => (
-          <button
-            key={m}
-            style={{ ...s.modeBtn, ...(mode === m ? s.modeBtnActive : {}) }}
-            disabled={isSending}
-            onClick={() => setMode(m)}
-            title={hint}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       <div style={s.pttRow}>
@@ -361,18 +343,6 @@ const s = {
     fontFamily: 'inherit',
     boxSizing: 'border-box' as const,
   },
-  modeRow: { display: 'flex', gap: '8px' },
-  modeBtn: {
-    flex: 1,
-    background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)',
-    color: 'var(--muted)',
-    cursor: 'pointer',
-    fontSize: '13px',
-    padding: '8px 0',
-  },
-  modeBtnActive: { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-dim)' },
   pttRow: { display: 'flex', alignItems: 'center', gap: '8px' },
   pttLabel: { fontSize: '13px', color: 'var(--muted)' },
   range: { width: '100%', accentColor: 'var(--accent)', display: 'block' as const, marginTop: '4px' },

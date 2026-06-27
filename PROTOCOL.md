@@ -20,19 +20,21 @@ Every transmitted unit is a Frame. GGWave wraps each Frame in its own sync pream
 
 ```
  Byte  Bits     Field
- ────  ───────  ──────────────────────────────────────
-  0    7..4     VER       — protocol version (currently 0x1)
-  0    3..0     FLAGS     — see §1.1
-  1    7..0     MSG_TYPE  — message type (see §2)
-  2    7..4     SEG_IDX   — fragment index, 0-based  (meaningful only if FRAG=1)
-  2    3..0     SEG_TOT   — total fragment count     (meaningful only if FRAG=1)
+ ────  ───────  ──────────────────────────────────────────────────────────────
+  0    7..4     VER        — protocol version (currently 0x1)
+  0    3..0     FLAGS      — see §1.1
+  1    7..0     MSG_TYPE   — message type (see §2)
+  2    7..4     SEG_IDX    — fragment index, 0-based  (meaningful only if FRAG=1)
+  2    3..0     SEG_TOT    — total fragment count     (meaningful only if FRAG=1)
   3    7..0     PAYLOAD_LEN — length of PAYLOAD in bytes
-  4..  —        PAYLOAD   — PAYLOAD_LEN bytes
-  last 2 bytes  CRC16     — CRC-16/CCITT-FALSE, big-endian (see §5)
-                            computed over bytes 0..(3 + PAYLOAD_LEN) inclusive
+  4..5 —        SESSION_ID  — uint16, big-endian; identifies the logical
+                              transmission session (0x0000 = unset / legacy)
+  6..  —        PAYLOAD    — PAYLOAD_LEN bytes
+  last 2 bytes  CRC16      — CRC-16/CCITT-FALSE, big-endian (see §5)
+                             computed over bytes 0..(5 + PAYLOAD_LEN) inclusive
 ```
 
-Total frame length: `6 + PAYLOAD_LEN` bytes.
+Total frame length: `8 + PAYLOAD_LEN` bytes.
 
 ### 1.1 FLAGS (4 bits, byte 0 bits 3..0)
 
@@ -279,11 +281,12 @@ Cycle:
 
 The receiver runs a continuous decode loop:
 
-1. GGWave detects sync preamble → emit `signal-detected`
-2. GGWave decodes frame bytes → validate CRC16
+1. Audio codec detects sync preamble → emit `signal-detected`
+2. Audio codec decodes frame bytes → validate CRC16
 3. CRC fail → emit `frame-error`, discard
 4. CRC pass → process frame (see §3.4), emit `frame-received`
-5. Duplicate frame (same MSG_TYPE + SEG_IDX already received with valid CRC) → discard silently
+5. Duplicate frame (same SESSION_ID + MSG_TYPE + SEG_IDX already received with valid CRC) → discard silently
+6. New SESSION_ID (differs from previous in this decode stream) → reset session context, begin new session
 
 ### 3.4 Frame processing
 
@@ -380,9 +383,8 @@ This tone must be played via the same audio output that feeds the radio mic.
 
 ## 7. Known v1 limitations (deferred to v2)
 
-- No session ID: receiver cannot distinguish two independent simultaneous sessions
 - No sender identification field in frame (use CONTACT with CONT=1 as convention)
 - DCS code for RADIO type not encodable
-- Max 15 fragments per message (~330 bytes logical payload)
+- Max 15 fragments per message (~300 bytes logical payload with MAX_PAYLOAD=20)
 - No explicit ACK/NACK (receiver cannot request retransmission; relies on cyclic repetition)
 - SESSION_SEQ to differentiate multiple same-type non-CONT messages in one session

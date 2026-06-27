@@ -19,16 +19,24 @@ export class SessionContext {
   private _context: TrilinkMessage | null = null;
   private _fragmentBuffers = new Map<string, FragmentBuffer>();
   private _received = new Set<string>();
+  private _sessionId: number | null = null;
 
   get context(): TrilinkMessage | null {
     return this._context;
   }
 
   feed(frame: TrilinkFrame): SessionFeedResult {
-    const { flags, msgType, segIdx, segTot, payload } = frame;
+    // New SESSION_ID → start a fresh session context
+    if (this._sessionId !== null && frame.sessionId !== this._sessionId) {
+      this.reset();
+    }
+    this._sessionId = frame.sessionId;
+
+    const { flags, msgType, segIdx, segTot, payload, sessionId } = frame;
+    const sid = sessionId;
 
     if (!flags.frag) {
-      const key = `${msgType}:0:0:${flags.cont}`;
+      const key = `${sid}:${msgType}:0:0:${flags.cont}`;
       if (this._received.has(key)) return { status: 'duplicate' };
       this._received.add(key);
 
@@ -38,8 +46,8 @@ export class SessionContext {
     }
 
     // Fragmented message
-    const bufKey = `${msgType}:${segTot}:${flags.cont}`;
-    const receiveKey = `${msgType}:${segTot}:frag:${flags.cont}`;
+    const bufKey     = `${sid}:${msgType}:${segTot}:${flags.cont}`;
+    const receiveKey = `${sid}:${msgType}:${segTot}:frag:${flags.cont}`;
     if (this._received.has(receiveKey)) return { status: 'duplicate' };
 
     let buf = this._fragmentBuffers.get(bufKey);
@@ -97,6 +105,7 @@ export class SessionContext {
     this._context = null;
     this._fragmentBuffers.clear();
     this._received.clear();
+    this._sessionId = null;
   }
 }
 
@@ -107,11 +116,21 @@ export interface SessionMessage {
   cont?: boolean;
 }
 
-export function buildSession(messages: SessionMessage[]): TrilinkFrame[] {
+/**
+ * Build an ordered Frame[] from a set of messages for one logical transmission.
+ * All frames share the same SESSION_ID (auto-generated random uint16 if not provided).
+ */
+export function buildSession(
+  messages: SessionMessage[],
+  sessionId?: number,
+): TrilinkFrame[] {
+  const sid = sessionId ?? (Math.random() * 0xffff | 0);
   const frames: TrilinkFrame[] = [];
   for (const { message, cont } of messages) {
     const opts: EncodeOptions = { cont: cont ?? false };
-    frames.push(...encodeMessage(message, opts));
+    for (const frame of encodeMessage(message, opts)) {
+      frames.push({ ...frame, sessionId: sid });
+    }
   }
   return frames;
 }

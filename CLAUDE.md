@@ -20,12 +20,15 @@ The protocol is designed as a public standard ("народный стандар�
 pnpm monorepo. Packages in dependency order:
 
 ```
-packages/protocol/    @trillink/protocol   — zero-dep codec: encode/decode/CRC/session
-packages/audio-web/   @trillink/audio-web  — GGWave WASM + Web Audio API adapter
-packages/audio-rn/    @trillink/audio-rn   — React Native audio adapter (expo-av)
-packages/sdk/         @trillink/sdk        — TrilinkSender / TrilinkReceiver (platform-agnostic)
-packages/ui/          @trillink/ui         — Web Components + Preact SPA + Service Worker
-apps/demo/            (private)            — demo SPA
+packages/protocol/       @trillink/protocol      — zero-dep codec: encode/decode/CRC/session
+packages/audio-web/      @trillink/audio-web     — DTMF-FSK codec + Web Audio API adapter
+packages/audio-rn/       @trillink/audio-rn      — React Native audio adapter (expo-av)
+packages/sdk/            @trillink/sdk           — TrilinkSender / TrilinkReceiver (platform-agnostic)
+packages/coord-parser/   @trillink/coord-parser  — parse coordinates from any format/URL
+packages/map-providers/  @trillink/map-providers — build map URLs for Google, Yandex, OSM, 2GIS
+packages/ui/             @trillink/ui            — Web Components + Service Worker
+apps/trillink/           (private)               — main SPA (Preact + Signals + Leaflet)
+apps/cli/                (private)               — CLI for TX/RX/roundtrip testing
 ```
 
 ---
@@ -38,8 +41,16 @@ pnpm -r build                                   # build all packages
 pnpm -r test                                    # run all tests
 pnpm --filter @trillink/protocol test           # test one package
 pnpm --filter @trillink/protocol test -- --watch  # watch mode
-pnpm --filter demo dev                          # demo SPA dev server
+pnpm --filter trillink dev                      # app dev server (localhost + LAN)
 pnpm --filter @trillink/ui build                # build UI package
+
+# CLI tool (apps/cli) — no build step needed, tsx runs TypeScript directly
+pnpm --filter @trillink/cli roundtrip -- --type GEO --lat 55.7558 --lon 37.6176
+pnpm --filter @trillink/cli roundtrip -- --type GEO --lat 55.7558 --lon 37.6176 --debug
+pnpm --filter @trillink/cli tx -- --type TEXT --text "hello" -o signal.wav
+pnpm --filter @trillink/cli rx -- -i signal.wav --debug
+# Pipe: tx → rx
+pnpm --filter @trillink/cli tx -- --type GEO --lat 55 --lon 37 | pnpm --filter @trillink/cli rx
 ```
 
 ---
@@ -53,12 +64,14 @@ Current: **v1**. The `VER` nibble in every frame header encodes this. Breaking w
 ## Critical implementation constraints
 
 ### Frame size
-Maximum GGWave payload: **28 bytes** per frame. Keep `MAX_PAYLOAD = 22` bytes for message payload (leaves 6 bytes for frame overhead). Never produce frames larger than 28 bytes.
+Maximum audio-codec payload: **28 bytes** per frame. `MAX_PAYLOAD = 20` bytes for message payload (8 bytes overhead: 6-byte header + 2-byte CRC). Never produce frames larger than 28 bytes.
+
+Frame layout: `VER|FLAGS` · `MSG_TYPE` · `SEG_IDX|SEG_TOT` · `PAYLOAD_LEN` · `SESSION_ID[2]` · `PAYLOAD[N]` · `CRC16[2]`
 
 ### CRC specification
 **CRC-16/CCITT-FALSE**: poly=0x1021, init=0xFFFF, no reflection, no final XOR.
 Check value: `crc16("123456789") === 0x29B1`.
-CRC is computed over `frame[0 .. 3+PAYLOAD_LEN]`, appended big-endian.
+CRC is computed over `frame[0 .. 5+PAYLOAD_LEN]`, appended big-endian.
 
 ### Integer encoding
 All multi-byte integers in frame payloads: **big-endian**.
@@ -70,8 +83,23 @@ Sentinel for absent `orig_lat`/`orig_lon` in ROUTE (int32): `0x7FFFFFFF`.
 
 ### Audio channel bandwidth
 All target channels (GSM, walkie-talkie, VoIP): usable range ~300–3000 Hz.
-GGWave `AUDIBLE` mode uses ~1400–2100 Hz — within range.
-Never configure GGWave to use `ULTRASONIC` or `ULTRASONIC_FAST` modes.
+All codec tones must stay within this band. Never use ULTRASONIC modes.
+
+### Codec layer (decided, replaces GGWave for TX)
+GGWave was replaced with a swappable `AudioCodec` abstraction.
+
+**Default codec: DTMF-FSK 16-tone** (`packages/audio-web/src/codecs/dtmf-fsk.ts`):
+- Sync: 500 Hz for 400 ms (outside data range, Goertzel-detectable)
+- Data tones: 700–2200 Hz, 100 Hz step, 16 tones = 4 bits/symbol
+- Symbol: 36 ms tone + 4 ms silence = 40 ms total; 3 ms cosine fade
+- Encoding: high nibble first per byte
+- Duration: `0.4 + N × 0.08` seconds for N payload bytes
+- TX implemented; RX not yet implemented
+
+**`CodecSpec`** = `'dtmf-fsk' | AudioCodec`. String = default options, object = custom.
+`TxHandle` has both `.stop()` and `.promise: Promise<TxResult>` — both await and abort patterns work.
+
+GGWave is still used for RX (`decoder.ts`, `ggwave.ts`) until FSK RX is implemented.
 
 ### PTT/walkie-talkie preamble
 Before the first frame in each cycle: play a **1500 Hz sine wave at −6 dBFS for 600–800 ms**.
@@ -96,10 +124,12 @@ Web Audio API requires a user gesture before `AudioContext` can start.
 
 ## Development priorities
 
-1. Implement and fully test `@trillink/protocol` before touching audio — it has no browser dependencies and can be tested in Node.js/Vitest
-2. Integrate GGWave in `@trillink/audio-web` and run PDR tests on real channels **early** (Phase 2) — GGWave channel behaviour is the biggest unknown
-3. `@trillink/sdk` — thin orchestration layer; depends only on the `AudioAdapter` interface
-4. `@trillink/ui` — last, after protocol and audio are validated
+1. `@trillink/protocol` — zero-dep, test in Node.js/Vitest first. Done.
+2. `@trillink/audio-web` TX via DTMF-FSK — listen/tune in browser. In progress.
+3. `@trillink/audio-web` RX via DTMF-FSK — Goertzel sync detection + nibble decoder.
+4. PDR testing on real channels (GSM, walkie-talkie) with DTMF-FSK.
+5. `@trillink/sdk` — thin orchestration layer; depends only on `AudioAdapter`.
+6. `@trillink/ui` — last, after protocol and audio are validated.
 
 ---
 

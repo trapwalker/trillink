@@ -39,7 +39,7 @@ export function ReceiveView({ autoStart, onStarted }: Props) {
     setStatus('Starting…');
 
     try {
-      const adapter = new WebAudioAdapter({ mode: 'balanced' });
+      const adapter = new WebAudioAdapter();
       adapterRef.current = adapter;
 
       const rx = new TrilinkReceiver({

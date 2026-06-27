@@ -9,6 +9,7 @@ const baseFrame = {
   msgType: MessageType.GEO,
   segIdx: 0,
   segTot: 0,
+  sessionId: 0x1234,
   payload: new Uint8Array([0x01, 0x02, 0x03]),
   crc: 0,
 };
@@ -21,6 +22,7 @@ describe('encodeFrame / decodeFrame', () => {
     expect(decoded.version).toBe(PROTOCOL_VERSION);
     expect(decoded.flags).toEqual({ cont: false, frag: false });
     expect(decoded.msgType).toBe(MessageType.GEO);
+    expect(decoded.sessionId).toBe(0x1234);
     expect(decoded.payload).toEqual(baseFrame.payload);
   });
 
@@ -69,7 +71,8 @@ describe('encodeFrame / decodeFrame', () => {
   });
 
   it('throws TruncatedError when frame is too short', () => {
-    expect(() => decodeFrame(new Uint8Array([0x10, 0x01, 0x00, 0x03, 0x00]))).toThrow(TruncatedError);
+    // Min frame = 8 bytes (6 header + 0 payload + 2 CRC); 7 bytes is too short
+    expect(() => decodeFrame(new Uint8Array([0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]))).toThrow(TruncatedError);
   });
 
   it('throws VersionError for unknown protocol version', () => {
@@ -78,10 +81,10 @@ describe('encodeFrame / decodeFrame', () => {
     expect(() => decodeFrame(encoded)).toThrow(VersionError);
   });
 
-  it('frame size equals 6 + payload length', () => {
+  it('frame size equals 8 + payload length', () => {
     const payload = new Uint8Array(10);
     const encoded = encodeFrame({ ...baseFrame, payload });
-    expect(encoded.length).toBe(6 + 10);
+    expect(encoded.length).toBe(8 + 10);
   });
 
   it('CRC covers header and payload', () => {

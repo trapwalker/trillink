@@ -14,5 +14,5 @@ export type ReceiverEvent =
   | { type: 'frame-error'; reason: 'crc' | 'version' | 'truncated' | 'unknown' }
   | { type: 'fragment-received'; msgType: MessageType; segIdx: number; segTotal: number }
   | { type: 'fragment-timeout'; msgType: MessageType; received: number; total: number }
-  | { type: 'message-ready'; message: TrilinkMessage; isCont: boolean }
+  | { type: 'message-ready'; message: TrilinkMessage; isCont: boolean; sessionId: number }
   | { type: 'context-updated'; context: TrilinkMessage; continuation: TrilinkMessage };

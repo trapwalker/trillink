@@ -163,8 +163,8 @@ describe('encodeMessage', () => {
   });
 
   it('throws on too-large message', () => {
-    // Text large enough to exceed 15 fragments × 22 bytes = 330 payload bytes
-    // TEXT prefix is 1 byte (encoding), so text must be >329 chars
+    // Max = 15 fragments × 20 bytes = 300 payload bytes.
+    // TEXT prefix is 1 byte (encoding), so max text = 299 ASCII chars.
     const text = 'A'.repeat(400);
     expect(() => encodeMessage({ type: 'TEXT', text })).toThrow(PayloadError);
   });

@@ -79,7 +79,7 @@ export class TrilinkReceiver {
 
     if (result.status === 'ready') {
       const prevContext = this.ctx.context;
-      this.emit({ type: 'message-ready', message: result.message, isCont: result.isCont });
+      this.emit({ type: 'message-ready', message: result.message, isCont: result.isCont, sessionId: frame.sessionId });
       if (result.isCont && prevContext !== null) {
         this.emit({ type: 'context-updated', context: prevContext, continuation: result.message });
       }

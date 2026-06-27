@@ -137,4 +137,42 @@ describe('buildSession', () => {
     const [frame] = buildSession([{ message: { type: 'GEO', lat: 0, lon: 0 } }]);
     expect(frame!.flags.cont).toBe(false);
   });
+
+  it('all frames share the same sessionId', () => {
+    const frames = buildSession([
+      { message: { type: 'GEO', lat: 1, lon: 2 } },
+      { message: { type: 'TEXT', text: 'Hi' }, cont: true },
+    ]);
+    const sid = frames[0]!.sessionId;
+    expect(sid).toBeGreaterThan(0);
+    frames.forEach((f) => expect(f.sessionId).toBe(sid));
+  });
+
+  it('accepts an explicit sessionId', () => {
+    const frames = buildSession([{ message: { type: 'GEO', lat: 0, lon: 0 } }], 0xABCD);
+    expect(frames[0]!.sessionId).toBe(0xABCD);
+  });
+});
+
+describe('SessionContext — SESSION_ID', () => {
+  it('deduplicates frames with same sessionId', () => {
+    const ctx = new SessionContext();
+    const [frame] = buildSession([{ message: { type: 'GEO', lat: 1, lon: 2 } }], 1);
+    const decoded = decodeFrame(encodeFrame(frame!));
+    expect(ctx.feed(decoded).status).toBe('ready');
+    expect(ctx.feed(decoded).status).toBe('duplicate');
+  });
+
+  it('resets context when a new sessionId arrives', () => {
+    const ctx = new SessionContext();
+    const [frame1] = buildSession([{ message: { type: 'GEO', lat: 1, lon: 2 } }], 1);
+    const [frame2] = buildSession([{ message: { type: 'GEO', lat: 3, lon: 4 } }], 2);
+    ctx.feed(decodeFrame(encodeFrame(frame1!)));
+    // Different sessionId — previous dedup state is cleared
+    const result = ctx.feed(decodeFrame(encodeFrame(frame2!)));
+    expect(result.status).toBe('ready');
+    if (result.status === 'ready' && result.message.type === 'GEO') {
+      expect(result.message.lat).toBeCloseTo(3, 5);
+    }
+  });
 });

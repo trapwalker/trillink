@@ -227,6 +227,65 @@ interface SessionMessage {
 
 ---
 
+## AudioCodec interface (`@trillink/audio-web`)
+
+Sits between the frame byte layer and the platform audio API. Encapsulates one
+modulation scheme. The adapter holds a codec instance; swap it to change modulation.
+
+```typescript
+// Spec accepted by WebAudioAdapter: string name or custom object
+type CodecSpec = 'dtmf-fsk' | AudioCodec;
+
+interface AudioCodec {
+  readonly id: string;
+  readonly name: string;
+  estimateDuration(payloadBytes: number): number;   // seconds
+  transmit(payload: Uint8Array, ctx: AudioContext, handlers?: TxHandlers): TxHandle;
+  startReceiving(ctx: AudioContext, stream: MediaStream, handlers: RxHandlers): Promise<RxHandle>;
+}
+
+interface TxHandle {
+  stop(): void;
+  readonly promise: Promise<TxResult>;   // resolves when done or after stop()
+}
+
+interface TxResult { elapsedSec: number; completed: boolean; }
+
+interface RxHandlers {
+  onStart?(): void;
+  /**
+   * Called per received byte. Return true to declare the buffer complete early —
+   * lets the protocol layer signal "frame done" without the codec knowing frame format.
+   */
+  onProgress?(buffer: Uint8Array, elapsedSec: number): boolean | void;
+  onEnd?(buffer: Uint8Array, elapsedSec: number): void;
+  onLevel?(rms: number): void;
+  onError?(reason: 'framing' | 'timeout' | 'noise'): void;
+}
+```
+
+### Current codec: DTMF-FSK 16-tone (`packages/audio-web/src/codecs/dtmf-fsk.ts`)
+
+```
+[SYNC 500 Hz · 400 ms] [symbol × 2N · 40 ms each]
+```
+
+| Parameter       | Value              |
+|----------------|--------------------|
+| Sync tone      | 500 Hz, 400 ms     |
+| Data tones     | 700–2200 Hz (100 Hz step, 16 tones) |
+| Symbol duration| 40 ms (36 ms tone + 4 ms silence)   |
+| Fade in/out    | 3 ms cosine ramp (click-free)        |
+| Encoding       | High nibble first, 4 bits/symbol     |
+
+Duration formula: `0.4 + N × 0.08` seconds for N payload bytes (vs GGWave ~3 s).
+
+Tones are in the 300–3000 Hz GSM/radio usable band. The 500 Hz sync frequency
+is outside the data-tone range (700–2200 Hz), making it unambiguous for Goertzel
+detection. RX not yet implemented — TX-only for now.
+
+---
+
 ## AudioAdapter interface
 
 Both `@trillink/audio-web` and `@trillink/audio-rn` implement this interface.
@@ -359,7 +418,7 @@ Fires DOM events:
 import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
 import { WebAudioAdapter } from '@trillink/audio-web';
 
-const audio = new WebAudioAdapter({ mode: 'AUDIBLE' });
+const audio = new WebAudioAdapter({ codec: 'dtmf-fsk' });
 
 // Sender
 const tx = new TrilinkSender({ audio, cycles: 3 });

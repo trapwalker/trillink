@@ -1,0 +1,13 @@
+[     177ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5175/favicon.ico:0
+[  517813ms] [WARNING] The ScriptProcessorNode is deprecated. Use AudioWorkletNode instead. (https://bit.ly/audio-worklet) @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:60
+[  517831ms] [WARNING] Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently @ http://localhost:5175/src/components/ReceiveView.tsx:107
+[  521451ms] [LOG] [FSK-RX] SYNC detected @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:72
+[  522810ms] [LOG] [FSK-RX] END: 16 bytes – 10 01 00 0a 03 47 3b c0 02 34 93 40 7f ff d9 c9 @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:75
+[  530298ms] [LOG] [FSK-RX] SYNC detected @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:72
+[  531657ms] [LOG] [FSK-RX] END: 16 bytes – 10 01 00 0a 03 48 c2 60 02 34 93 40 7f ff 90 16 @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:75
+[  536156ms] [WARNING] The ScriptProcessorNode is deprecated. Use AudioWorkletNode instead. (https://bit.ly/audio-worklet) @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:60
+[  536173ms] [WARNING] Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently @ http://localhost:5175/src/components/ReceiveView.tsx:107
+[  538595ms] [LOG] [FSK-RX] SYNC detected @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:72
+[  539961ms] [LOG] [FSK-RX] END: 16 bytes – 10 01 00 0a 03 48 c2 60 02 34 93 40 7f ff 90 16 @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:75
+[ 1286530ms] [LOG] [FSK-RX] SYNC detected @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:72
+[ 1288115ms] [LOG] [FSK-RX] END: 19 bytes – 10 01 00 0a 03 48 c2 60 02 34 93 40 7f ff 90 16 66 66 66 @ http://localhost:5175/@fs/Users/svp/projects/own/trillink/packages/audio-web/src/codecs/dtmf-fsk.ts:75
