@@ -5,7 +5,7 @@ import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 import {
   addEntry, nextEntryId, isListening, audioLevel, signalDetected,
-  isSending, modal, closeModal, openModal, pttEnabled, journal, journalLoaded,
+  isSending, sendProgress, modal, closeModal, openModal, pttEnabled, journal, journalLoaded,
 } from './store/index.js';
 import { Toolbar }          from './components/Toolbar.js';
 import { Journal }          from './components/Journal.js';
@@ -100,9 +100,12 @@ export function App() {
         cycles: 1,
         preambleDurationMs: pttEnabled.value ? 700 : 0,
         onEvent(e) {
-          if (e.type === 'transmission-complete' || e.type === 'aborted') {
-            isSending.value = false;
-            senderRef.current = null;
+          if (e.type === 'cycle-start') {
+            sendProgress.value = e.total > 1 ? `Cycle ${e.cycle + 1}/${e.total}` : '';
+          } else if (e.type === 'transmission-complete' || e.type === 'aborted') {
+            isSending.value    = false;
+            sendProgress.value = '';
+            senderRef.current  = null;
           }
         },
       });

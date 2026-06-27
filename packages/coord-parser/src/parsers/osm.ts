@@ -1,9 +1,9 @@
 import type { CoordParser, ParsedCoord } from '../types.js';
 
-// openstreetmap.org/#map=16/55.756/37.617  or  ?lat=55.756&lon=37.617
+// openstreetmap.org/#map=16/55.756/37.617  or  ?mlat=55.756&mlon=37.617  or  ?lat=55.756&lon=37.617
 const HASH_RE = /#map=\d+\/(-?\d+\.\d+)\/(-?\d+\.\d+)/;
-const LAT_RE  = /[?&]lat=(-?\d+\.\d+)/;
-const LON_RE  = /[?&]lon=(-?\d+\.\d+)/;
+const LAT_RE  = /[?&]m?lat=(-?\d+\.\d+)/;
+const LON_RE  = /[?&]m?lon=(-?\d+\.\d+)/;
 
 function isOsmUrl(s: string): boolean {
   return /openstreetmap\.org/i.test(s);
