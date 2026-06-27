@@ -87,35 +87,37 @@ export function GeoSendModal({ onSend, onClose }: Props) {
       }
     >
       <div style={s.form}>
-        <div style={s.inputRow}>
-          <input
-            style={s.input}
-            type="text"
-            placeholder="55.7558, 37.6176  or  maps.yandex.ru/...  or  55°45′N 37°37′E"
-            value={coordInput}
-            autoFocus
-            onInput={(e) => handleInputChange((e.target as HTMLInputElement).value)}
-            onFocus={() => setShowLru(lru.length > 0)}
-            onBlur={() => setTimeout(() => setShowLru(false), 150)}
-          />
-          <button style={s.locBtn} onClick={locateMe} disabled={locating} title="Use my location">
-            {locating ? '…' : '📍'}
-          </button>
-        </div>
-
-        {showLru && lru.length > 0 && (
-          <div style={s.lru}>
-            {lru.map((c, i) => (
-              <button
-                key={i}
-                style={s.lruItem}
-                onMouseDown={() => applyCoord(c.lat, c.lon, c.label)}
-              >
-                {c.label ?? `${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}`}
-              </button>
-            ))}
+        <div style={s.inputWrap}>
+          <div style={s.inputRow}>
+            <input
+              style={s.input}
+              type="text"
+              placeholder="55.7558, 37.6176  or  maps.yandex.ru/...  or  55°45′N 37°37′E"
+              value={coordInput}
+              autoFocus
+              onInput={(e) => handleInputChange((e.target as HTMLInputElement).value)}
+              onFocus={() => setShowLru(lru.length > 0)}
+              onBlur={() => setTimeout(() => setShowLru(false), 150)}
+            />
+            <button style={s.locBtn} onClick={locateMe} disabled={locating} title="Use my location">
+              {locating ? '…' : '📍'}
+            </button>
           </div>
-        )}
+
+          {showLru && lru.length > 0 && (
+            <div style={s.lru}>
+              {lru.map((c, i) => (
+                <button
+                  key={i}
+                  style={s.lruItem}
+                  onMouseDown={() => applyCoord(c.lat, c.lon, c.label)}
+                >
+                  {c.label ?? `${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}`}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {error && <div style={s.error}>{error}</div>}
 
@@ -155,6 +157,7 @@ function btnStyle(variant: 'primary' | 'secondary') {
 
 const s = {
   form: { display: 'flex', flexDirection: 'column' as const, gap: '10px' },
+  inputWrap: { position: 'relative' as const },
   inputRow: { display: 'flex', gap: '8px' },
   input: {
     flex: 1,
@@ -165,6 +168,8 @@ const s = {
     fontSize: '14px',
     padding: '10px 12px',
     outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box' as const,
   },
   locBtn: {
     background: 'var(--surface)',
@@ -177,6 +182,10 @@ const s = {
     flexShrink: 0,
   },
   lru: {
+    position: 'absolute' as const,
+    top: 'calc(100% + 4px)',
+    left: 0,
+    right: 0,
     background: 'var(--surface)',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius)',
@@ -184,6 +193,8 @@ const s = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '2px',
+    zIndex: 100,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
   },
   lruItem: {
     background: 'none',
