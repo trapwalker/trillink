@@ -91,12 +91,13 @@ export function ReceiveView({ autoStart, onStarted }: Props) {
     setStatus('');
   }
 
-  // Auto-start when prop changes
+  // Auto-start on mount when autoStart is set (initialised from #listen hash before first render)
   useEffect(() => {
-    if (autoStart && !listening) {
+    if (autoStart) {
       void startListening();
     }
-  }, [autoStart]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Waterfall animation loop
   useEffect(() => {
@@ -197,7 +198,12 @@ export function ReceiveView({ autoStart, onStarted }: Props) {
           />
         )}
         {status && <span style={s.statusText}>{status}</span>}
-        {error && <span style={{ ...s.statusText, color: 'var(--red)' }}>{error}</span>}
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' as const }}>
+            <span style={{ ...s.statusText, color: 'var(--red)' }}>{error}</span>
+            <button style={s.tapBtn} onClick={startListening}>Tap to start</button>
+          </div>
+        )}
       </div>
 
       {listening && (
@@ -321,7 +327,17 @@ const s = {
     fontSize: '14px',
     padding: '14px 16px',
   },
-  statusRow: { display: 'flex', alignItems: 'center', gap: '8px', minHeight: '20px' },
+  statusRow: { display: 'flex', alignItems: 'center', gap: '8px', minHeight: '20px', flexWrap: 'wrap' as const },
+  tapBtn: {
+    background: 'var(--accent)',
+    border: 'none',
+    borderRadius: 'var(--radius)',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: '13px',
+    padding: '6px 14px',
+    fontWeight: 600,
+  },
   dot: { width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0 },
   statusText: { fontSize: '14px', color: 'var(--muted)' },
   meters: { display: 'flex', flexDirection: 'column' as const, gap: '6px' },

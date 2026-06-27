@@ -21,6 +21,7 @@ export class TrilinkSender {
   private _extraCycles = 0;
   private _aborted = false;
   private _running = false;
+  private _sleepResolve: (() => void) | null = null;
 
   constructor(opts: SenderOptions) {
     this.audio = opts.audio;
@@ -57,12 +58,15 @@ export class TrilinkSender {
 
         if (this.preambleDurationMs > 0) {
           await this.audio.playPreamble(this.preambleDurationMs);
+          if (this._aborted) { this.emit({ type: 'aborted' }); return; }
         }
 
         await this.audio.play(frames, {
           preambleDurationMs: 0,
           interFrameGapMs: this.interFrameGapMs,
         });
+
+        if (this._aborted) { this.emit({ type: 'aborted' }); return; }
 
         for (const frame of frames) {
           this.emit({ type: 'frame-sent', frame, cycle });
@@ -72,42 +76,41 @@ export class TrilinkSender {
         cycle++;
 
         if (cycle < this._baseCycles + this._extraCycles) {
-          await sleep(this.interCycleGapMs);
+          await this.sleepAbortable(this.interCycleGapMs);
+          if (this._aborted) { this.emit({ type: 'aborted' }); return; }
         }
       }
 
       this.emit({ type: 'transmission-complete' });
     } finally {
+      this._sleepResolve = null;
       this._running = false;
     }
   }
 
   abort(): void {
     this._aborted = true;
+    this.audio.stopPlayback();
+    this._sleepResolve?.();
+    this._sleepResolve = null;
   }
 
-  /** Estimate total transmission duration in seconds for the given messages. */
+  /**
+   * Estimate total transmission duration in seconds for the given messages.
+   * Calibrated empirically at 48 kHz against ggwave@0.4.0.
+   * All AUDIBLE_* protocols produce identical output length in this library version.
+   */
   static estimateDuration(
     messages: SessionMessage[],
-    opts: { mode?: 'fast' | 'balanced' | 'robust'; cycles?: number; interCycleGapMs?: number; interFrameGapMs?: number }
+    opts: { cycles?: number; interCycleGapMs?: number; interFrameGapMs?: number },
   ): number {
     const frames = buildSession(messages);
     const cycles = opts.cycles ?? 1;
     const interCycleGapMs = opts.interCycleGapMs ?? 1500;
     const interFrameGapMs = opts.interFrameGapMs ?? 200;
 
-    // Calibrated at 48 kHz (from empirical GGWave benchmarks):
-    //   fast (AUDIBLE_FASTEST):  overhead=2.56s, 0.133s/byte
-    //   balanced (AUDIBLE_FAST): overhead=3.86s, 0.216s/byte
-    //   robust (AUDIBLE_NORMAL): overhead=4.43s, 0.323s/byte
-    const [overhead, perByte] =
-      opts.mode === 'robust'   ? [4.43, 0.323] :
-      opts.mode === 'balanced' ? [3.86, 0.216] :
-                                 [2.56, 0.133];
-
     const framesSec = frames.reduce((sum, f) => {
-      const bytes = encodeFrame(f).length;
-      return sum + overhead + perByte * bytes;
+      return sum + ggwaveFrameDurationSec(encodeFrame(f).length);
     }, 0);
     const gapsSec = (frames.length - 1) * (interFrameGapMs / 1000);
     const cycleSec = framesSec + gapsSec;
@@ -115,11 +118,34 @@ export class TrilinkSender {
     return cycleSec * cycles + totalGapsSec;
   }
 
+  private sleepAbortable(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this._sleepResolve = resolve;
+      setTimeout(() => {
+        this._sleepResolve = null;
+        resolve();
+      }, ms);
+    });
+  }
+
   private emit(e: SenderEvent): void {
     this.onEvent?.(e);
   }
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Empirical ggwave@0.4.0 frame duration table at 48 kHz (GGWAVE_SAMPLE_FORMAT_F32).
+ * Steps follow Reed-Solomon block boundaries. Max trillink frame = 28 bytes.
+ */
+function ggwaveFrameDurationSec(frameBytes: number): number {
+  if (frameBytes <= 1)  return 1.067;
+  if (frameBytes <= 2)  return 1.259;
+  if (frameBytes <= 4)  return 1.451;
+  if (frameBytes <= 8)  return 1.643;
+  if (frameBytes <= 12) return 2.027;
+  if (frameBytes <= 18) return 2.411;
+  if (frameBytes <= 22) return 2.795;
+  if (frameBytes <= 24) return 2.987;
+  if (frameBytes <= 26) return 3.179;
+  return 3.371; // 27-28 bytes
 }

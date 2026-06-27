@@ -6,6 +6,7 @@ import ggwave_factory from 'ggwave';
 
 export type GGWaveModule = Awaited<ReturnType<typeof ggwave_factory>>;
 
+// Verified against ggwave@0.4.0: ProtocolId enum values
 export const GGWaveProtocol = {
   AUDIBLE_NORMAL:   0,
   AUDIBLE_FAST:     1,
@@ -33,6 +34,11 @@ export async function getGGWave(sampleRate = 48_000): Promise<{ gw: GGWaveModule
     params.sampleRateInp = sampleRate;
     params.sampleRateOut = sampleRate;
     params.sampleRate = sampleRate;
+    // Default sampleFormatInp/Out is already F32 in ggwave@0.4.0 — keep it explicit
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const F32 = (gw as any).SampleFormat.GGWAVE_SAMPLE_FORMAT_F32;
+    params.sampleFormatInp = F32;
+    params.sampleFormatOut = F32;
     _instance = gw.init(params) as number;
     _sampleRate = sampleRate;
   }
@@ -40,18 +46,18 @@ export async function getGGWave(sampleRate = 48_000): Promise<{ gw: GGWaveModule
   return { gw, instance: _instance };
 }
 
-/** Convert the Int8Array from GGWave encode to Float32 for Web Audio API (−1.0..1.0). */
+/**
+ * Convert GGWave encode output (Int8Array of raw F32 bytes) to Float32Array.
+ * GGWave with GGWAVE_SAMPLE_FORMAT_F32 packs 4 bytes per audio sample.
+ */
 export function i8ToF32(src: Int8Array): Float32Array {
-  const dst = new Float32Array(src.length);
-  for (let i = 0; i < src.length; i++) dst[i] = (src[i] ?? 0) / 128.0;
-  return dst;
+  return new Float32Array(src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength));
 }
 
-/** Convert Float32 samples from Web Audio API to Int8 for GGWave decode. */
+/**
+ * Convert Float32Array from Web Audio API to raw F32 bytes for GGWave decode.
+ * Inverse of i8ToF32 — no scaling, just byte reinterpretation.
+ */
 export function f32ToI8(src: Float32Array): Int8Array {
-  const dst = new Int8Array(src.length);
-  for (let i = 0; i < src.length; i++) {
-    dst[i] = Math.max(-128, Math.min(127, Math.round((src[i] ?? 0) * 128.0)));
-  }
-  return dst;
+  return new Int8Array(src.buffer.slice(src.byteOffset, src.byteOffset + src.byteLength));
 }

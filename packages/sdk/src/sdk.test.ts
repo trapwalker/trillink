@@ -22,6 +22,7 @@ function makeMockAdapter(): AudioAdapter & {
     async play(frames, _opts?: PlayOptions) {
       playedFrames.push([...frames]);
     },
+    stopPlayback() {},
     async startListening(onFrame) {
       _listening = true;
       _onFrame = onFrame;

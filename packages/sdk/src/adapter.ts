@@ -11,6 +11,8 @@ export interface PlayOptions {
  */
 export interface AudioAdapter {
   play(frames: TrilinkFrame[], opts?: PlayOptions): Promise<void>;
+  /** Immediately interrupt any in-progress play() or playPreamble() call. */
+  stopPlayback(): void;
   startListening(onFrame: (frame: TrilinkFrame) => void, onSignal?: () => void, onLevel?: (rms: number) => void): Promise<void>;
   stopListening(): Promise<void>;
   playPreamble(durationMs: number): Promise<void>;

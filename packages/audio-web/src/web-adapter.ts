@@ -4,6 +4,7 @@ import { type DecoderHandle, startDecoder } from './decoder.js';
 import { framesToAudioBuffer, type EncodeAudioOptions } from './encoder.js';
 import { GGWaveProtocol, type GGWaveProtocol as GGWaveProtocolType } from './ggwave.js';
 import { createPreambleBuffer } from './preamble.js';
+import type { PlayHandle } from './player.js';
 import { playBuffer } from './player.js';
 
 /**
@@ -33,6 +34,7 @@ export class WebAudioAdapter implements AudioAdapter {
   private _ctx: AudioContext | null = null;
   private _stream: MediaStream | null = null;
   private _decoder: DecoderHandle | null = null;
+  private _playHandle: PlayHandle | null = null;
   private readonly protocol: GGWaveProtocolType;
   private readonly volume: number;
   private readonly defaultPreambleMs: number;
@@ -52,6 +54,11 @@ export class WebAudioAdapter implements AudioAdapter {
     return this._decoder?.analyser ?? null;
   }
 
+  stopPlayback(): void {
+    this._playHandle?.stop();
+    this._playHandle = null;
+  }
+
   private getOrCreateContext(): AudioContext {
     if (!this._ctx || this._ctx.state === 'closed') {
       this._ctx = new AudioContext();
@@ -65,7 +72,10 @@ export class WebAudioAdapter implements AudioAdapter {
 
     const preambleMs = opts.preambleDurationMs ?? 0;
     if (preambleMs > 0) {
-      await playBuffer(ctx, createPreambleBuffer(ctx, preambleMs));
+      const handle = playBuffer(ctx, createPreambleBuffer(ctx, preambleMs));
+      this._playHandle = handle;
+      await handle.promise;
+      this._playHandle = null;
     }
 
     const encodeOpts: EncodeAudioOptions = {
@@ -74,14 +84,20 @@ export class WebAudioAdapter implements AudioAdapter {
       interFrameGapMs: opts.interFrameGapMs ?? 200,
     };
     const buffer = await framesToAudioBuffer(frames, ctx, encodeOpts);
-    await playBuffer(ctx, buffer);
+    const handle = playBuffer(ctx, buffer);
+    this._playHandle = handle;
+    await handle.promise;
+    this._playHandle = null;
   }
 
   async playPreamble(durationMs: number): Promise<void> {
     const ctx = this.getOrCreateContext();
     if (ctx.state === 'suspended') await ctx.resume();
     const ms = durationMs > 0 ? durationMs : this.defaultPreambleMs;
-    await playBuffer(ctx, createPreambleBuffer(ctx, ms));
+    const handle = playBuffer(ctx, createPreambleBuffer(ctx, ms));
+    this._playHandle = handle;
+    await handle.promise;
+    this._playHandle = null;
   }
 
   async startListening(

@@ -1,19 +1,13 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { SendView } from './components/SendView.js';
 import { ReceiveView } from './components/ReceiveView.js';
 
 type Tab = 'send' | 'receive';
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('send');
-  const [autoStartReceive, setAutoStartReceive] = useState(false);
-
-  useEffect(() => {
-    if (location.hash === '#listen') {
-      setTab('receive');
-      setAutoStartReceive(true);
-    }
-  }, []);
+  // Initialize directly from URL hash so ReceiveView mounts with autoStart on first render
+  const [tab, setTab] = useState<Tab>(() => location.hash === '#listen' ? 'receive' : 'send');
+  const [autoStartReceive, setAutoStartReceive] = useState(() => location.hash === '#listen');
 
   return (
     <div style={styles.root}>
