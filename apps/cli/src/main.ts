@@ -114,21 +114,24 @@ function rx(
   samples: Float32Array,
   sampleRate: number,
   opts: { debug: boolean; threshold: number },
-): Uint8Array | null {
-  let result: Uint8Array | null = null;
+): Uint8Array[] {
+  const results: Uint8Array[] = [];
+  let frameNum = 0;
 
   const decoder = new FskDecoder(
     sampleRate,
     {
-      onSync: () => err('[SYNC] detected'),
+      onSync: () => err(`[SYNC] frame ${frameNum} detected`),
       onByte: (byte, idx) => {
         if (!opts.debug)
           err(`[BYTE ${String(idx).padStart(3, '0')}] 0x${byte.toString(16).padStart(2, '0').toUpperCase()}`);
       },
       onEnd: (bytes) => {
-        result = bytes;
-        err(`\n[END] ${bytes.length} bytes total`);
+        err(`\n[END] frame ${frameNum} — ${bytes.length} bytes`);
         err(`[HEX] ${hex(bytes)}`);
+        results.push(new Uint8Array(bytes));
+        frameNum++;
+        decoder.reset();
       },
       onDebug: opts.debug ? (line) => err(line) : undefined,
     },
@@ -138,7 +141,7 @@ function rx(
   decoder.process(samples);
   decoder.flush();
 
-  return result;
+  return results;
 }
 
 // ── Subcommands ───────────────────────────────────────────────────────────────
@@ -192,21 +195,22 @@ else if (sub === 'rx') {
 
   err(`[RX] ${samples.length} samples at ${sampleRate} Hz (${Math.round(samples.length / sampleRate * 1000)} ms)`);
 
-  const bytes = rx(samples, sampleRate, { debug, threshold });
-  if (!bytes) { err('[ERROR] no signal decoded'); process.exit(1); }
+  const framesList = rx(samples, sampleRate, { debug, threshold });
+  if (framesList.length === 0) { err('[ERROR] no signal decoded'); process.exit(1); }
 
-  try {
-    const frame = decodeFrame(bytes);
-    const ctx   = new SessionContext();
-    const res   = ctx.feed(frame);
-    if (res.status === 'ready') {
-      process.stdout.write(JSON.stringify(res.message, null, 2) + '\n');
-    } else {
-      err(`[RX] session status: ${res.status}`);
+  const ctx = new SessionContext();
+  for (const bytes of framesList) {
+    try {
+      const frame = decodeFrame(bytes);
+      const res   = ctx.feed(frame);
+      if (res.status === 'ready') {
+        process.stdout.write(JSON.stringify(res.message, null, 2) + '\n');
+      } else if (res.status !== 'buffered' && res.status !== 'duplicate') {
+        err(`[RX] session status: ${res.status}`);
+      }
+    } catch (e) {
+      err(`[ERROR] frame decode: ${e}`);
     }
-  } catch (e) {
-    err(`[ERROR] frame decode: ${e}`);
-    process.exit(1);
   }
 }
 
@@ -217,27 +221,42 @@ else if (sub === 'roundtrip') {
   const { samples, sampleRate, frameBytesList } = tx(args);
   err('\n[ROUNDTRIP] decoding...\n');
 
-  const bytes = rx(samples, sampleRate, { debug, threshold });
+  const decodedList = rx(samples, sampleRate, { debug, threshold });
 
-  if (!bytes) { err('\n[ROUNDTRIP] FAIL: no signal decoded'); process.exit(1); }
-
-  const expected = frameBytesList[0]!;
-  const pass = bytes.length === expected.length && bytes.every((b, i) => b === expected[i]);
-  err(`\n[ROUNDTRIP] ${pass ? '✓ PASS' : '✗ FAIL'} (decoded ${bytes.length}/${expected.length} bytes)`);
-
-  if (!pass) {
-    err(`[EXPECTED] ${hex(expected)}`);
-    err(`[GOT]      ${hex(bytes)}`);
+  if (decodedList.length === 0) {
+    err('\n[ROUNDTRIP] FAIL: no signal decoded');
     process.exit(1);
   }
 
+  if (decodedList.length !== frameBytesList.length) {
+    err(`\n[ROUNDTRIP] FAIL: expected ${frameBytesList.length} frame(s), got ${decodedList.length}`);
+    process.exit(1);
+  }
+
+  let allPass = true;
+  for (const [i, decoded] of decodedList.entries()) {
+    const expected = frameBytesList[i]!;
+    const pass = decoded.length === expected.length && decoded.every((b, j) => b === expected[j]);
+    err(`\n[ROUNDTRIP] frame ${i}: ${pass ? '✓ PASS' : '✗ FAIL'} (${decoded.length}/${expected.length} bytes)`);
+    if (!pass) {
+      err(`[EXPECTED] ${hex(expected)}`);
+      err(`[GOT]      ${hex(decoded)}`);
+      allPass = false;
+    }
+  }
+
+  if (!allPass) process.exit(1);
+
+  // Assemble and print the decoded message
   try {
-    const frame = decodeFrame(bytes);
-    const ctx   = new SessionContext();
-    const res   = ctx.feed(frame);
-    if (res.status === 'ready') {
-      err('\n[MESSAGE]');
-      process.stdout.write(JSON.stringify(res.message, null, 2) + '\n');
+    const ctx = new SessionContext();
+    for (const bytes of decodedList) {
+      const frame = decodeFrame(bytes);
+      const res   = ctx.feed(frame);
+      if (res.status === 'ready') {
+        err('\n[MESSAGE]');
+        process.stdout.write(JSON.stringify(res.message, null, 2) + '\n');
+      }
     }
   } catch (e) {
     err(`[ERROR] ${e}`);

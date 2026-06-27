@@ -144,7 +144,7 @@ export class FskDecoder {
 
     while (this.accumLen >= this.winN && this.state !== 'done') {
       this._window(this.accum.subarray(0, this.winN));
-      if (this.accumLen < this.stepN) break; // reset() was called inside _window
+      if (this.accumLen < this.stepN) break; // safety: buffer drained mid-window
       this.accum.copyWithin(0, this.stepN, this.accumLen);
       this.accumLen -= this.stepN;
       this.posN     += this.stepN;
@@ -161,19 +161,28 @@ export class FskDecoder {
     }
   }
 
-  /** Reset to initial state so the decoder can receive the next message. */
-  reset(): void {
-    this.state      = 'searching';
-    this.accumLen   = 0;
-    this.posN       = 0;
-    this.syncWins   = 0;
-    this.syncReady  = false;
+  /**
+   * Reset the FSK state machine so the decoder can receive the next message.
+   *
+   * By default the audio accumulator is kept so any audio already buffered
+   * is processed for the next message. Pass `clearBuffer = true` to also
+   * discard pending audio (use this when the audio source is being stopped).
+   */
+  reset(clearBuffer = false): void {
+    this.state       = 'searching';
+    this.syncWins    = 0;
+    this.syncReady   = false;
     this.streakTone  = -2;
     this.streakCount = 0;
-    this.curTone    = -1;
-    this.curStartN  = 0;
-    this.hiNibble   = -1;
-    this.bytes      = [];
+    this.curTone     = -1;
+    this.curStartN   = 0;
+    this.hiNibble    = -1;
+    this.bytes       = [];
+
+    if (clearBuffer) {
+      this.accumLen = 0;
+      this.posN     = 0;
+    }
   }
 
   getBytes(): Uint8Array { return new Uint8Array(this.bytes); }
