@@ -1,5 +1,5 @@
 import type { TrilinkMessage } from '@trillink/protocol';
-import { WebAudioAdapter, type ReliabilityMode } from '@trillink/audio-web';
+import { WebAudioAdapter } from '@trillink/audio-web';
 import { TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 
@@ -39,14 +39,10 @@ export class TrilinkReceiverElement extends HTMLElement {
     void this.stopListening();
   }
 
-  private get mode(): ReliabilityMode {
-    return (this.getAttribute('mode') ?? 'balanced') as ReliabilityMode;
-  }
-
   async startListening(): Promise<void> {
     if (this._listening) return;
 
-    const adapter = new WebAudioAdapter({ mode: this.mode });
+    const adapter = new WebAudioAdapter();
     this._receiver = new TrilinkReceiver({
       audio: adapter,
       onEvent: (e: ReceiverEvent) => this.handleEvent(e),

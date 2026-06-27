@@ -1,6 +1,6 @@
 import type { TrilinkMessage } from '@trillink/protocol';
 import { ContactType } from '@trillink/protocol';
-import { WebAudioAdapter, type ReliabilityMode } from '@trillink/audio-web';
+import { WebAudioAdapter } from '@trillink/audio-web';
 import { TrilinkSender } from '@trillink/sdk';
 
 /**
@@ -31,10 +31,6 @@ export class TrilinkSenderElement extends HTMLElement {
     this.render();
   }
 
-  private get mode(): ReliabilityMode {
-    return (this.getAttribute('mode') ?? 'balanced') as ReliabilityMode;
-  }
-
   private get ptt(): boolean {
     return this.hasAttribute('ptt');
   }
@@ -50,7 +46,7 @@ export class TrilinkSenderElement extends HTMLElement {
   }
 
   async sendMessages(messages: { message: TrilinkMessage; cont?: boolean }[]): Promise<void> {
-    const adapter = new WebAudioAdapter({ mode: this.mode, ptt: this.ptt });
+    const adapter = new WebAudioAdapter({ ptt: this.ptt });
     this._sender = new TrilinkSender({
       audio: adapter,
       cycles: this.cycles,

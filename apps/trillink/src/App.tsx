@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
-import { WebAudioAdapter, DtmfFskCodec } from '@trillink/audio-web';
+import { WebAudioAdapter } from '@trillink/audio-web';
 import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 import {
   addEntry, nextEntryId, isListening, audioLevel, signalDetected,
-  isSending, modal, closeModal, openModal, pttEnabled,
+  isSending, modal, closeModal, openModal, pttEnabled, journal, journalLoaded,
 } from './store/index.js';
 import { Toolbar }          from './components/Toolbar.js';
 import { Journal }          from './components/Journal.js';
@@ -113,12 +113,18 @@ export function App() {
     }
   }
 
-  // Keyboard: Escape closes modal
+  // Keyboard: Escape closes modal; Cmd+C copies last journal entry
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeModal();
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        // Cmd/Ctrl+Enter — handled inside modals themselves
+      if (e.key === 'Escape') { closeModal(); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        // Only intercept when nothing is selected
+        if (window.getSelection()?.toString()) return;
+        const top = journal.value[0];
+        if (!top) return;
+        e.preventDefault();
+        const text = formatMessageForClipboard(top.message);
+        navigator.clipboard?.writeText(text).catch(() => {});
       }
     };
     document.addEventListener('keydown', handler);
@@ -132,9 +138,12 @@ export function App() {
       <Toolbar onSend={sendMessage} />
       <WaterfallPanel analyserRef={analyserRef} />
       <StatusBar onStartListening={startListening} onStopListening={stopListening} />
-      <Journal onSelectEntry={(entry) => {
-        if (entry.message.type === 'GEO') openModal({ type: 'geo-detail', entry });
-      }} />
+      <Journal
+        loading={!journalLoaded.value}
+        onSelectEntry={(entry) => {
+          if (entry.message.type === 'GEO') openModal({ type: 'geo-detail', entry });
+        }}
+      />
 
       {m.type === 'geo-send'     && <GeoSendModal onSend={sendMessage} onClose={closeModal} />}
       {m.type === 'geo-detail'   && <GeoDetailModal entry={m.entry} onSend={sendMessage} onClose={closeModal} />}
@@ -143,6 +152,21 @@ export function App() {
       {m.type === 'time-send'    && <TimeSendModal onSend={sendMessage} onClose={closeModal} />}
     </div>
   );
+}
+
+function formatMessageForClipboard(msg: TrilinkMessage): string {
+  switch (msg.type) {
+    case 'GEO':
+      return `${msg.lat.toFixed(6)}, ${msg.lon.toFixed(6)}${msg.alt !== undefined ? ` alt:${msg.alt}m` : ''}`;
+    case 'CONTACT':
+      return msg.value;
+    case 'TEXT':
+      return msg.text;
+    case 'TIME':
+      return new Date(msg.unixTs * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    default:
+      return msg.type;
+  }
 }
 
 const s = {

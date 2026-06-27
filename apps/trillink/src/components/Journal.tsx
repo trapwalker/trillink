@@ -3,11 +3,23 @@ import { buildAllMapUrls } from '@trillink/map-providers';
 import type { TrilinkMessage, GeoMessage } from '@trillink/protocol';
 
 interface Props {
+  loading?: boolean;
   onSelectEntry: (entry: JournalEntry) => void;
 }
 
-export function Journal({ onSelectEntry }: Props) {
+export function Journal({ loading, onSelectEntry }: Props) {
   const entries = journal.value;
+
+  if (loading) {
+    return (
+      <div style={s.container}>
+        <div style={s.empty}>
+          <span style={s.emptyIcon}>◌</span>
+          <span>Loading…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={s.container}>
