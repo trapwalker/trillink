@@ -1,6 +1,6 @@
 import type { TrilinkMessage, GeoMessage } from '@trillink/protocol';
 import { buildAllMapUrls } from '@trillink/map-providers';
-import { journal, type JournalEntry } from '../../store/index.js';
+import { journal, showToast, type JournalEntry } from '../../store/index.js';
 import { Modal }      from '../Modal.js';
 import { LeafletMap } from '../LeafletMap.js';
 
@@ -28,7 +28,9 @@ export function GeoDetailModal({ entry, onSend, onClose }: Props) {
   }
 
   function copyCoords() {
-    navigator.clipboard?.writeText(`${lat.toFixed(6)}, ${lon.toFixed(6)}`).catch(() => {});
+    navigator.clipboard?.writeText(`${lat.toFixed(6)}, ${lon.toFixed(6)}`)
+      .then(() => showToast('Copied!'))
+      .catch(() => {});
   }
 
   return (

@@ -92,6 +92,17 @@ export function pushLruCoord(c: LruCoord): void {
   localStorage.setItem(COORD_LRU_KEY, JSON.stringify([c, ...list].slice(0, MAX_LRU)));
 }
 
+// ── Toast notifications ───────────────────────────────────────────────────────
+
+export const toast = signal('');
+let _toastTimer = 0;
+
+export function showToast(msg: string, durationMs = 1800): void {
+  toast.value = msg;
+  clearTimeout(_toastTimer);
+  _toastTimer = window.setTimeout(() => { toast.value = ''; }, durationMs);
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 const PTT_KEY = 'trillink:ptt';

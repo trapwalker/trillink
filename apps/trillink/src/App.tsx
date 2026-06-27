@@ -5,7 +5,8 @@ import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 import {
   addEntry, nextEntryId, isListening, audioLevel, signalDetected,
-  isSending, sendProgress, modal, closeModal, openModal, pttEnabled, journal, journalLoaded,
+  isSending, sendProgress, modal, closeModal, openModal, pttEnabled,
+  journal, journalLoaded, toast, showToast,
 } from './store/index.js';
 import { Toolbar }          from './components/Toolbar.js';
 import { Journal }          from './components/Journal.js';
@@ -127,7 +128,9 @@ export function App() {
         if (!top) return;
         e.preventDefault();
         const text = formatMessageForClipboard(top.message);
-        navigator.clipboard?.writeText(text).catch(() => {});
+        navigator.clipboard?.writeText(text)
+          .then(() => showToast('Copied!'))
+          .catch(() => {});
       }
     };
     document.addEventListener('keydown', handler);
@@ -153,6 +156,10 @@ export function App() {
       {m.type === 'contact-send' && <ContactSendModal onSend={sendMessage} onClose={closeModal} />}
       {m.type === 'text-send'    && <TextSendModal onSend={sendMessage} onClose={closeModal} />}
       {m.type === 'time-send'    && <TimeSendModal onSend={sendMessage} onClose={closeModal} />}
+
+      {toast.value && (
+        <div style={s.toast}>{toast.value}</div>
+      )}
     </div>
   );
 }
@@ -180,5 +187,22 @@ const s = {
     maxWidth: '720px',
     margin: '0 auto',
     overflow: 'hidden',
+  },
+  toast: {
+    position: 'fixed' as const,
+    bottom: '24px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: '20px',
+    color: 'var(--text)',
+    fontSize: '13px',
+    fontWeight: 500,
+    padding: '8px 16px',
+    pointerEvents: 'none' as const,
+    zIndex: 2000,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+    whiteSpace: 'nowrap' as const,
   },
 } as const;

@@ -1,4 +1,4 @@
-import { journal, type JournalEntry } from '../store/index.js';
+import { journal, showToast, type JournalEntry } from '../store/index.js';
 import { buildAllMapUrls } from '@trillink/map-providers';
 import type { TrilinkMessage, GeoMessage } from '@trillink/protocol';
 
@@ -98,7 +98,9 @@ function MapButtons({ lat, lon }: { lat: number; lon: number }) {
 function CopyBtn({ text }: { text: string }) {
   function copy(e: Event) {
     e.stopPropagation();
-    navigator.clipboard?.writeText(text).catch(() => {});
+    navigator.clipboard?.writeText(text)
+      .then(() => showToast('Copied!'))
+      .catch(() => {});
   }
   return (
     <button style={s.copyBtn} onClick={copy} title="Copy coordinates">
