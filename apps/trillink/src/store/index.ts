@@ -1,5 +1,6 @@
-import { signal, computed } from '@preact/signals';
+import { signal } from '@preact/signals';
 import type { TrilinkMessage } from '@trillink/protocol';
+import { persistEntry, loadJournal } from './db.js';
 
 // ── Journal ───────────────────────────────────────────────────────────────────
 
@@ -8,6 +9,7 @@ export interface JournalEntry {
   message: TrilinkMessage;
   direction: 'in' | 'out';
   sessionId: number;
+  isCont: boolean;
   ts: Date;
   continuations: JournalEntry[];
 }
@@ -16,31 +18,37 @@ let _nextId = 1;
 export function nextEntryId(): number { return _nextId++; }
 
 export const journal = signal<JournalEntry[]>([]);
+export const journalLoaded = signal(false);
+
+// Load persisted journal on startup; set _nextId above the max stored id.
+loadJournal().then((entries) => {
+  if (entries.length > 0) {
+    const maxId = Math.max(...entries.map(function maxId(e): number {
+      return Math.max(e.id, ...e.continuations.map(maxId));
+    }));
+    _nextId = maxId + 1;
+    journal.value = entries;
+  }
+  journalLoaded.value = true;
+}).catch(() => { journalLoaded.value = true; });
 
 export function addEntry(entry: JournalEntry): void {
-  if (entry.direction === 'in' && entry.message.type !== 'GEO' && entry.message.type !== 'TEXT'
-    && entry.message.type !== 'CONTACT' && entry.message.type !== 'TIME') {
-    journal.value = [entry, ...journal.value].slice(0, 200);
-    return;
-  }
-  // Attempt to attach CONT messages to their parent entry (same session)
-  if (entry.direction === 'in') {
+  // CONT messages get attached to the primary message of the same session.
+  if (entry.isCont && entry.direction === 'in' && entry.sessionId !== 0) {
     const parentIdx = journal.value.findIndex(
-      (e) => e.sessionId === entry.sessionId && e.continuations !== undefined
-        && e.message.type !== entry.message.type,
+      (e) => e.sessionId === entry.sessionId && !e.isCont,
     );
     if (parentIdx >= 0) {
       const updated = [...journal.value];
-      const parent = { ...updated[parentIdx]! };
-      parent.continuations = [...parent.continuations, entry];
+      const parent = { ...updated[parentIdx]!, continuations: [...updated[parentIdx]!.continuations, entry] };
       updated[parentIdx] = parent;
-      // Move updated parent to top
-      updated.splice(parentIdx, 1);
-      journal.value = [parent, ...updated].slice(0, 200);
+      journal.value = updated;
+      void persistEntry(entry, updated[parentIdx]!.id);
       return;
     }
   }
   journal.value = [entry, ...journal.value].slice(0, 200);
+  void persistEntry(entry, null);
 }
 
 // ── Audio / receiver state ────────────────────────────────────────────────────

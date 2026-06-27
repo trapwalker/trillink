@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0f1117"/>
+
+  <!-- Signal / wave arcs centred on the lower-left dot -->
+  <!-- Dot (transmitter) -->
+  <circle cx="152" cy="360" r="28" fill="#4f8ef7"/>
+
+  <!-- Arc 1 -->
+  <path d="M 152 312
+             A 48 48 0 0 1 200 360"
+        fill="none" stroke="#4f8ef7" stroke-width="22" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- Arc 2 -->
+  <path d="M 152 264
+             A 96 96 0 0 1 248 360"
+        fill="none" stroke="#4f8ef7" stroke-width="22" stroke-linecap="round" opacity="0.65"/>
+
+  <!-- Arc 3 -->
+  <path d="M 152 216
+             A 144 144 0 0 1 296 360"
+        fill="none" stroke="#4f8ef7" stroke-width="22" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Horizontal link line -->
+  <line x1="296" y1="360" x2="380" y2="360" stroke="#3ddc84" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- Receiver dot -->
+  <circle cx="380" cy="360" r="28" fill="#3ddc84"/>
+</svg>

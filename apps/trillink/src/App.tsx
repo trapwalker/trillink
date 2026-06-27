@@ -5,7 +5,7 @@ import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 import {
   addEntry, nextEntryId, isListening, audioLevel, signalDetected,
-  isSending, modal, closeModal, pttEnabled,
+  isSending, modal, closeModal, openModal, pttEnabled,
 } from './store/index.js';
 import { Toolbar }          from './components/Toolbar.js';
 import { Journal }          from './components/Journal.js';
@@ -48,6 +48,7 @@ export function App() {
               message: e.message,
               direction: 'in',
               sessionId: e.sessionId,
+              isCont: e.isCont,
               ts: new Date(),
               continuations: [],
             });
@@ -87,6 +88,7 @@ export function App() {
       message,
       direction: 'out',
       sessionId: 0,
+      isCont: false,
       ts: new Date(),
       continuations: [],
     });
@@ -131,11 +133,7 @@ export function App() {
       <WaterfallPanel analyserRef={analyserRef} />
       <StatusBar onStartListening={startListening} onStopListening={stopListening} />
       <Journal onSelectEntry={(entry) => {
-        if (entry.message.type === 'GEO') {
-          import('./store/index.js').then(({ openModal }) =>
-            openModal({ type: 'geo-detail', entry })
-          );
-        }
+        if (entry.message.type === 'GEO') openModal({ type: 'geo-detail', entry });
       }} />
 
       {m.type === 'geo-send'     && <GeoSendModal onSend={sendMessage} onClose={closeModal} />}
