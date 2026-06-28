@@ -39,11 +39,11 @@ export class TrilinkSender {
     this._extraCycles++;
   }
 
-  async send(messages: SessionMessage[]): Promise<void> {
+  async send(messages: SessionMessage[], sessionId?: number): Promise<void> {
     this._aborted = false;
     this._extraCycles = 0;
     this._running = true;
-    const frames = buildSession(messages);
+    const frames = buildSession(messages, sessionId);
 
     try {
       let cycle = 0;

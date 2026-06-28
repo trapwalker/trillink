@@ -5,7 +5,7 @@ import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 import {
   addEntry, nextEntryId, isListening, listenError, debugCapture, audioLevel, signalDetected,
-  isSending, sendProgress, modal, closeModal, openModal, pttEnabled,
+  isSending, sendProgress, modal, closeModal, openModal, pttEnabled, lastSent,
   journal, journalLoaded, toast, showToast, showWaterfall, showMap,
   type JournalEntry,
 } from './store/index.js';
@@ -120,23 +120,27 @@ export function App() {
   async function sendMessage(messages: TrilinkMessage[]) {
     closeModal();
     isSending.value = true;
+    lastSent.value  = messages;
 
+    // Generate session ID here so the journal entry and the wire frames share the same ID.
+    // When the device receives its own transmission, addEntry detects the matching
+    // sessionId and marks the outgoing entry with selfEchoAt instead of creating a new one.
+    const sessionId = Math.random() * 0xffff | 0;
     const now = new Date();
     const [primary, ...extras] = messages;
 
-    // Group all messages from one send action into a single journal entry
     const entry: JournalEntry = {
       id: nextEntryId(),
       message: primary!,
       direction: 'out',
-      sessionId: 0,
+      sessionId,
       isCont: false,
       ts: now,
       continuations: extras.map((message) => ({
         id: nextEntryId(),
         message,
         direction: 'out' as const,
-        sessionId: 0,
+        sessionId,
         isCont: true,
         ts: now,
         continuations: [],
@@ -161,12 +165,16 @@ export function App() {
         },
       });
       senderRef.current = sender;
-      // Secondary messages marked cont:true so receiver groups them under the primary
-      await sender.send(messages.map((message, i) => ({ message, cont: i > 0 })));
+      await sender.send(messages.map((message, i) => ({ message, cont: i > 0 })), sessionId);
     } catch (err) {
       console.error('[sendMessage]', err);
       isSending.value = false;
     }
+  }
+
+  function handleRetry() {
+    const msgs = lastSent.value;
+    if (msgs && !isSending.value) void sendMessage(msgs);
   }
 
   function openEntry(entry: JournalEntry) {
@@ -203,16 +211,11 @@ export function App() {
   const wfVis      = wfEnabled && listening;
   const mapVis     = showMap.value;
 
+  const canRetry = lastSent.value !== null && !isSending.value;
+
   return (
     <div style={s.root}>
-      <Toolbar />
-
-      {wfVis && (
-        <>
-          <WaterfallPanel analyserRef={analyserRef} height={wfHeight} />
-          <ResizeHandle onDrag={(dy) => setWfHeight((h) => clamp(h + dy, 60, 400))} />
-        </>
-      )}
+      <Toolbar onRetry={canRetry ? handleRetry : null} />
 
       {mapVis && (
         <>
@@ -222,6 +225,14 @@ export function App() {
       )}
 
       <StatusBar onStartListening={startListening} onStopListening={stopListening} />
+
+      {wfVis && (
+        <>
+          <WaterfallPanel analyserRef={analyserRef} height={wfHeight} />
+          <ResizeHandle onDrag={(dy) => setWfHeight((h) => clamp(h + dy, 60, 400))} />
+        </>
+      )}
+
       <Journal loading={!journalLoaded.value} onSelectEntry={openEntry} />
 
       {m.type === 'geo-send'      && <GeoSendModal onSend={sendMessage} onClose={closeModal} />}

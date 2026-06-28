@@ -38,8 +38,9 @@ export function Journal({ loading, onSelectEntry }: Props) {
 }
 
 function EntryCard({ entry, onSelect }: { entry: JournalEntry; onSelect: (e: JournalEntry) => void }) {
-  const isIn = entry.direction === 'in';
-  const msg  = entry.message;
+  const isIn    = entry.direction === 'in';
+  const msg     = entry.message;
+  const echoed  = entry.selfEchoAt !== undefined;
   const dirColor = isIn ? 'var(--accent)' : 'var(--green)';
 
   return (
@@ -71,6 +72,13 @@ function EntryCard({ entry, onSelect }: { entry: JournalEntry; onSelect: (e: Jou
           <span style={s.content}><ContentText msg={c.message} /></span>
         </div>
       ))}
+
+      {echoed && (
+        <div style={s.echoRow}>
+          <span style={s.echoArrow}>◀</span>
+          <span style={s.echoLabel}>echo · {formatTs(entry.selfEchoAt!)}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -200,6 +208,13 @@ const s = {
   content: { fontSize: '13px', color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
   mono: { fontFamily: 'var(--font)' },
   contIcon: { fontSize: '10px', flexShrink: 0 },
+  echoRow: {
+    display: 'flex', alignItems: 'center', gap: '5px',
+    padding: '2px 8px 5px 8px',
+    borderTop: '1px solid var(--border)',
+  },
+  echoArrow: { fontSize: '10px', color: 'var(--accent)', flexShrink: 0 },
+  echoLabel: { fontSize: '11px', color: 'var(--accent)', fontFamily: 'var(--font)' },
   actions: { display: 'flex', alignItems: 'center', gap: '2px', marginLeft: 'auto', flexShrink: 0 },
   actionBtn: {
     background: 'none',

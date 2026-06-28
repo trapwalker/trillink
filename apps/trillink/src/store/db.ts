@@ -19,6 +19,7 @@ interface StoredEntry {
   sessionId: number;
   isCont: boolean;
   ts: Date;
+  selfEchoAt?: Date;
 }
 
 const DB_NAME    = 'trillink';
@@ -48,6 +49,7 @@ export async function persistEntry(entry: JournalEntry, parentId: number | null 
     sessionId:   entry.sessionId,
     isCont:      entry.isCont,
     ts:          entry.ts,
+    ...(entry.selfEchoAt !== undefined && { selfEchoAt: entry.selfEchoAt }),
   };
   await db.put('journal', stored);
 
@@ -84,6 +86,7 @@ export async function loadJournal(): Promise<JournalEntry[]> {
       isCont:        row.isCont,
       ts:            new Date(row.ts),
       continuations: [],
+      ...(row.selfEchoAt !== undefined && { selfEchoAt: new Date(row.selfEchoAt) }),
     };
     byId.set(entry.id, entry);
   }

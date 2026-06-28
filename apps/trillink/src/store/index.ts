@@ -12,6 +12,8 @@ export interface JournalEntry {
   isCont: boolean;
   ts: Date;
   continuations: JournalEntry[];
+  /** Set when this outgoing entry was also received back by the same device (self-echo). */
+  selfEchoAt?: Date;
 }
 
 let _nextId = 1;
@@ -39,8 +41,37 @@ export function deleteEntry(id: number): void {
   void deleteEntries([id, ...entry.continuations.map((c) => c.id)]);
 }
 
+function messagesEqual(a: TrilinkMessage, b: TrilinkMessage): boolean {
+  if (a.type !== b.type) return false;
+  switch (a.type) {
+    case 'GEO':     { const bb = b as typeof a; return a.lat === bb.lat && a.lon === bb.lon && a.alt === bb.alt; }
+    case 'TEXT':    { const bb = b as typeof a; return a.text === bb.text; }
+    case 'CONTACT': { const bb = b as typeof a; return a.contactType === bb.contactType && a.value === bb.value; }
+    case 'TIME':    { const bb = b as typeof a; return a.unixTs === bb.unixTs && a.tzOffsetMin === bb.tzOffsetMin; }
+    default:        return false;
+  }
+}
+
 export function addEntry(entry: JournalEntry): void {
-  // CONT messages get attached to the primary message of the same session.
+  // 1. Self-echo: incoming frame that shares a sessionId with one of our outgoing entries.
+  //    Merge into the outgoing entry instead of creating a new one.
+  if (entry.direction === 'in' && entry.sessionId !== 0) {
+    const outIdx = journal.value.findIndex(
+      (e) => e.sessionId === entry.sessionId && e.direction === 'out',
+    );
+    if (outIdx >= 0) {
+      if (!entry.isCont) {
+        const updated = [...journal.value];
+        updated[outIdx] = { ...updated[outIdx]!, selfEchoAt: entry.ts };
+        journal.value = updated;
+        void persistEntry(updated[outIdx]!, null);
+      }
+      // Continuation echoes from our own session are silently dropped
+      return;
+    }
+  }
+
+  // 2. Incoming CONT — attach to the primary entry of the same session.
   if (entry.isCont && entry.direction === 'in' && entry.sessionId !== 0) {
     const parentIdx = journal.value.findIndex(
       (e) => e.sessionId === entry.sessionId && !e.isCont,
@@ -54,9 +85,30 @@ export function addEntry(entry: JournalEntry): void {
       return;
     }
   }
+
+  // 3. Duplicate suppression: if an identical incoming message already exists, just
+  //    update its timestamp to reflect the latest reception time.
+  if (entry.direction === 'in' && !entry.isCont) {
+    const dupIdx = journal.value.findIndex(
+      (e) => e.direction === 'in' && !e.isCont && messagesEqual(e.message, entry.message),
+    );
+    if (dupIdx >= 0) {
+      const updated = [...journal.value];
+      updated[dupIdx] = { ...updated[dupIdx]!, ts: entry.ts };
+      journal.value = updated;
+      void persistEntry(updated[dupIdx]!, null);
+      return;
+    }
+  }
+
+  // 4. New entry
   journal.value = [entry, ...journal.value].slice(0, 200);
   void persistEntry(entry, null);
 }
+
+// ── Last sent (for retry) ─────────────────────────────────────────────────────
+
+export const lastSent = signal<TrilinkMessage[] | null>(null);
 
 // ── Audio / receiver state ────────────────────────────────────────────────────
 

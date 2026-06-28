@@ -1,7 +1,11 @@
 import { useState } from 'preact/hooks';
 import { openModal, pttEnabled, isSending, showWaterfall, showMap } from '../store/index.js';
 
-export function Toolbar() {
+interface Props {
+  onRetry: (() => void) | null;
+}
+
+export function Toolbar({ onRetry }: Props) {
   const actions: { label: string; icon: string; modal: Parameters<typeof openModal>[0]['type'] }[] = [
     { label: 'GEO',     icon: '📍', modal: 'geo-send'     },
     { label: 'Contact', icon: '👤', modal: 'contact-send' },
@@ -29,6 +33,13 @@ export function Toolbar() {
           </button>
         ))}
       </nav>
+
+      <button
+        style={{ ...s.iconBtn, opacity: onRetry ? 1 : 0.35 }}
+        disabled={!onRetry}
+        title="Repeat last transmission"
+        onClick={() => onRetry?.()}
+      >↺</button>
 
       <Menu />
     </header>
