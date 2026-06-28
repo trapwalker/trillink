@@ -1,17 +1,11 @@
 import { useState } from 'preact/hooks';
-import type { TrilinkMessage } from '@trillink/protocol';
 import { openModal, pttEnabled, isSending, showWaterfall, showMap } from '../store/index.js';
 
-interface Props {
-  onSend: (msg: TrilinkMessage) => void;
-}
-
-export function Toolbar({ onSend: _onSend }: Props) {
+export function Toolbar() {
   const actions: { label: string; icon: string; modal: Parameters<typeof openModal>[0]['type'] }[] = [
-    { label: 'GEO',      icon: '📍', modal: 'geo-send'     },
-    { label: 'Contact',  icon: '👤', modal: 'contact-send' },
-    { label: 'Text',     icon: '💬', modal: 'text-send'    },
-    { label: 'Time',     icon: '⏰', modal: 'time-send'    },
+    { label: 'GEO',     icon: '📍', modal: 'geo-send'     },
+    { label: 'Contact', icon: '👤', modal: 'contact-send' },
+    { label: 'Text',    icon: '💬', modal: 'text-send'    },
   ];
 
   return (
@@ -31,7 +25,7 @@ export function Toolbar({ onSend: _onSend }: Props) {
             onClick={() => openModal({ type: a.modal } as Parameters<typeof openModal>[0])}
           >
             <span style={s.actionIcon}>{a.icon}</span>
-            <span style={s.actionLabel}>{a.label}</span>
+            <span style={s.actionLabel} className="action-label">{a.label}</span>
           </button>
         ))}
       </nav>

@@ -20,7 +20,6 @@ import { ContactDetailModal }   from './components/modals/ContactDetailModal.js'
 import { TimeDetailModal }      from './components/modals/TimeDetailModal.js';
 import { ContactSendModal }     from './components/modals/ContactSendModal.js';
 import { TextSendModal }        from './components/modals/TextSendModal.js';
-import { TimeSendModal }        from './components/modals/TimeSendModal.js';
 import { QrModal }              from './components/modals/QrModal.js';
 
 export function App() {
@@ -66,8 +65,12 @@ export function App() {
       rxRef.current = rx;
       await rx.start();
       analyserRef.current = adapter.analyser;
-    } catch {
+    } catch (err) {
+      console.error('[startListening]', err);
       isListening.value = false;
+      showToast(err instanceof DOMException && err.name === 'NotAllowedError'
+        ? 'Microphone access denied'
+        : 'Failed to start microphone');
     }
   }
 
@@ -87,19 +90,22 @@ export function App() {
 
   // ── Sender ───────────────────────────────────────────────────────────────────
 
-  async function sendMessage(message: TrilinkMessage) {
+  async function sendMessage(messages: TrilinkMessage[]) {
     closeModal();
     isSending.value = true;
 
-    addEntry({
-      id: nextEntryId(),
-      message,
-      direction: 'out',
-      sessionId: 0,
-      isCont: false,
-      ts: new Date(),
-      continuations: [],
-    });
+    const now = new Date();
+    for (const message of messages) {
+      addEntry({
+        id: nextEntryId(),
+        message,
+        direction: 'out',
+        sessionId: 0,
+        isCont: false,
+        ts: now,
+        continuations: [],
+      });
+    }
 
     try {
       const adapter = new WebAudioAdapter({ ptt: pttEnabled.value, volume: 60 });
@@ -118,8 +124,9 @@ export function App() {
         },
       });
       senderRef.current = sender;
-      await sender.send([{ message }]);
-    } catch {
+      await sender.send(messages.map((message) => ({ message })));
+    } catch (err) {
+      console.error('[sendMessage]', err);
       isSending.value = false;
     }
   }
@@ -152,13 +159,15 @@ export function App() {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  const m      = modal.value;
-  const wfVis  = showWaterfall.value && isListening.value;
-  const mapVis = showMap.value;
+  const m          = modal.value;
+  const wfEnabled  = showWaterfall.value;
+  const listening  = isListening.value;   // read separately — prevents short-circuit missing subscription
+  const wfVis      = wfEnabled && listening;
+  const mapVis     = showMap.value;
 
   return (
     <div style={s.root}>
-      <Toolbar onSend={sendMessage} />
+      <Toolbar />
 
       {wfVis && (
         <>
@@ -184,7 +193,6 @@ export function App() {
       {m.type === 'time-detail'   && <TimeDetailModal entry={m.entry} onSend={sendMessage} onClose={closeModal} />}
       {m.type === 'contact-send'  && <ContactSendModal onSend={sendMessage} onClose={closeModal} />}
       {m.type === 'text-send'     && <TextSendModal onSend={sendMessage} onClose={closeModal} />}
-      {m.type === 'time-send'     && <TimeSendModal onSend={sendMessage} onClose={closeModal} />}
       {m.type === 'qr'            && <QrModal onClose={closeModal} />}
 
       {toast.value && <div style={s.toast}>{toast.value}</div>}
@@ -205,8 +213,8 @@ function ResizeHandle({ onDrag }: { onDrag: (dy: number) => void }) {
   }
   function onTouchStart(e: TouchEvent) {
     e.preventDefault();
-    let lastY = e.touches[0].clientY;
-    function onMove(e: TouchEvent) { const dy = e.touches[0].clientY - lastY; lastY = e.touches[0].clientY; onDrag(dy); }
+    let lastY = e.touches[0]!.clientY;
+    function onMove(e: TouchEvent) { const dy = e.touches[0]!.clientY - lastY; lastY = e.touches[0]!.clientY; onDrag(dy); }
     function onEnd() { document.removeEventListener('touchmove', onMove as EventListener); document.removeEventListener('touchend', onEnd); }
     document.addEventListener('touchmove', onMove as EventListener, { passive: false });
     document.addEventListener('touchend', onEnd);

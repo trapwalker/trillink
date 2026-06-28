@@ -6,7 +6,7 @@ import { LeafletMap } from '../LeafletMap.js';
 
 interface Props {
   entry:   JournalEntry;
-  onSend:  (msg: TrilinkMessage) => void;
+  onSend:  (msgs: TrilinkMessage[]) => void;
   onClose: () => void;
 }
 
@@ -24,7 +24,7 @@ export function GeoDetailModal({ entry, onSend, onClose }: Props) {
     });
 
   function handleResend() {
-    onSend({ type: 'GEO', lat, lon, ...(alt !== undefined ? { alt } : {}) });
+    onSend([{ type: 'GEO', lat, lon, ...(alt !== undefined ? { alt } : {}) }]);
   }
 
   function copyCoords() {

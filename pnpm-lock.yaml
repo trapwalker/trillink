@@ -35,6 +35,12 @@ importers:
       '@trillink/audio-web':
         specifier: workspace:*
         version: link:../../packages/audio-web
+      '@trillink/coord-parser':
+        specifier: workspace:*
+        version: link:../../packages/coord-parser
+      '@trillink/map-providers':
+        specifier: workspace:*
+        version: link:../../packages/map-providers
       '@trillink/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

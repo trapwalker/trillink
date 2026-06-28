@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
 import { ContactType } from '@trillink/protocol';
 import { copyToClipboard } from '../../store/index.js';
 import { Modal } from '../Modal.js';
+import { TimeWidget } from '../TimeWidget.js';
 
 const LRU_KEY = 'trillink:contact-lru';
 
@@ -17,7 +18,7 @@ function pushLru(v: string) {
 }
 
 interface Props {
-  onSend:  (msg: TrilinkMessage) => void;
+  onSend:  (msgs: TrilinkMessage[]) => void;
   onClose: () => void;
 }
 
@@ -25,6 +26,7 @@ export function ContactSendModal({ onSend, onClose }: Props) {
   const [type, setType]   = useState<ContactType>(ContactType.PHONE);
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
+  const timeMsgRef = useRef<Extract<TrilinkMessage, { type: 'TIME' }> | null>(null);
   const lru = getLru();
 
   const label: Record<ContactType, string> = {
@@ -45,7 +47,9 @@ export function ContactSendModal({ onSend, onClose }: Props) {
     const v = value.trim();
     if (!v) { setError('Enter a value'); return; }
     pushLru(v);
-    onSend({ type: 'CONTACT', contactType: type, value: v });
+    const msgs: TrilinkMessage[] = [{ type: 'CONTACT', contactType: type, value: v }];
+    if (timeMsgRef.current) msgs.push(timeMsgRef.current);
+    onSend(msgs);
   }
 
   const handleKey = useCallback((e: KeyboardEvent) => {
@@ -105,6 +109,7 @@ export function ContactSendModal({ onSend, onClose }: Props) {
         )}
 
         {error && <div style={s.error}>{error}</div>}
+        <TimeWidget onChange={(msg) => { timeMsgRef.current = msg; }} />
       </div>
     </Modal>
   );

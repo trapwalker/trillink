@@ -20,6 +20,11 @@ export function MapPanel({ onSelectEntry, height }: Props) {
 
   const mapH = height - LEGEND_H;
 
+  // Notify Leaflet when the container is resized so it loads edge tiles
+  useEffect(() => {
+    mapRef.current?.invalidateSize();
+  }, [height]);
+
   useEffect(() => {
     if (!divRef.current) return;
     let map: Map;

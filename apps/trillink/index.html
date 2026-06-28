@@ -37,6 +37,8 @@
       .leaflet-control-attribution a { color: var(--accent) !important; }
       /* Secondary markers (history points) */
       .leaflet-marker-icon.trillink-secondary { opacity: 0.5; filter: hue-rotate(120deg); }
+      /* Icon-only toolbar buttons on narrow screens */
+      @media (max-width: 600px) { .action-label { display: none; } }
     </style>
   </head>
   <body>

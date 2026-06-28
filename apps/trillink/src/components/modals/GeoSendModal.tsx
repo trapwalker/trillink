@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
 import { parseCoord } from '@trillink/coord-parser';
 import { getLruCoords, pushLruCoord, copyToClipboard } from '../../store/index.js';
 import { Modal }      from '../Modal.js';
 import { LeafletMap } from '../LeafletMap.js';
+import { TimeWidget } from '../TimeWidget.js';
 
 interface Props {
-  onSend:  (msg: TrilinkMessage) => void;
+  onSend:  (msgs: TrilinkMessage[]) => void;
   onClose: () => void;
 }
 
@@ -17,6 +18,7 @@ export function GeoSendModal({ onSend, onClose }: Props) {
   const [error, setError] = useState('');
   const [locating, setLocating] = useState(false);
   const [showLru, setShowLru] = useState(false);
+  const timeMsgRef = useRef<Extract<TrilinkMessage, { type: 'TIME' }> | null>(null);
   const lru = getLruCoords();
 
   function applyCoord(newLat: number, newLon: number, label?: string) {
@@ -41,13 +43,25 @@ export function GeoSendModal({ onSend, onClose }: Props) {
   }
 
   function locateMe() {
+    if (!navigator.geolocation) {
+      setError('Geolocation requires HTTPS — use https:// URL');
+      return;
+    }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         applyCoord(coords.latitude, coords.longitude);
         setLocating(false);
       },
-      () => { setError('Geolocation unavailable'); setLocating(false); },
+      (err) => {
+        if (err.code === GeolocationPositionError.PERMISSION_DENIED)
+          setError('Location access denied — enable in browser settings');
+        else if (err.code === GeolocationPositionError.TIMEOUT)
+          setError('Geolocation timed out — try again');
+        else
+          setError('Geolocation unavailable');
+        setLocating(false);
+      },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }
@@ -68,7 +82,9 @@ export function GeoSendModal({ onSend, onClose }: Props) {
       return;
     }
     pushLruCoord({ lat, lon });
-    onSend({ type: 'GEO', lat, lon });
+    const msgs: TrilinkMessage[] = [{ type: 'GEO', lat, lon }];
+    if (timeMsgRef.current) msgs.push(timeMsgRef.current);
+    onSend(msgs);
   }
 
   const hasCoords = lat !== null && lon !== null;
@@ -138,6 +154,7 @@ export function GeoSendModal({ onSend, onClose }: Props) {
           onClick={(newLat, newLon) => applyCoord(newLat, newLon)}
         />
         <p style={s.hint}>Double-click or drag the marker to pick a location.</p>
+        <TimeWidget onChange={(msg) => { timeMsgRef.current = msg; }} />
       </div>
     </Modal>
   );

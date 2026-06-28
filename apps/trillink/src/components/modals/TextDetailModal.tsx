@@ -4,7 +4,7 @@ import { Modal } from '../Modal.js';
 
 interface Props {
   entry:   JournalEntry;
-  onSend:  (msg: TrilinkMessage) => void;
+  onSend:  (msgs: TrilinkMessage[]) => void;
   onClose: () => void;
 }
 
@@ -22,7 +22,7 @@ export function TextDetailModal({ entry, onSend, onClose }: Props) {
           <button style={s.secondary} onClick={onClose}>Close</button>
           <button style={s.icon} onClick={() => copyToClipboard(msg.text)} title="Copy">📋 Copy</button>
           {!isIn && (
-            <button style={s.primary} onClick={() => { onSend(msg); onClose(); }}>▶ Re-send</button>
+            <button style={s.primary} onClick={() => { onSend([msg]); onClose(); }}>▶ Re-send</button>
           )}
         </>
       }

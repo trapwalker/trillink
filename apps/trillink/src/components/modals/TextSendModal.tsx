@@ -1,20 +1,22 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
 import { MAX_PAYLOAD } from '@trillink/protocol';
 import { copyToClipboard } from '../../store/index.js';
 import { Modal } from '../Modal.js';
+import { TimeWidget } from '../TimeWidget.js';
 
 // TEXT payload: 1 byte encoding prefix + text bytes. Limit single-frame ASCII.
 const MAX_TEXT = MAX_PAYLOAD - 1;  // 19 bytes for a single frame, use as soft limit
 
 interface Props {
-  onSend:  (msg: TrilinkMessage) => void;
+  onSend:  (msgs: TrilinkMessage[]) => void;
   onClose: () => void;
 }
 
 export function TextSendModal({ onSend, onClose }: Props) {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
+  const timeMsgRef = useRef<Extract<TrilinkMessage, { type: 'TIME' }> | null>(null);
 
   const len = new TextEncoder().encode(text).length;
   const warn = len > MAX_TEXT;
@@ -22,7 +24,9 @@ export function TextSendModal({ onSend, onClose }: Props) {
   function handleSend() {
     const t = text.trim();
     if (!t) { setError('Enter some text'); return; }
-    onSend({ type: 'TEXT', text: t });
+    const msgs: TrilinkMessage[] = [{ type: 'TEXT', text: t }];
+    if (timeMsgRef.current) msgs.push(timeMsgRef.current);
+    onSend(msgs);
   }
 
   const handleKey = useCallback((e: KeyboardEvent) => {
@@ -66,6 +70,7 @@ export function TextSendModal({ onSend, onClose }: Props) {
           </div>
         </div>
         {error && <div style={s.error}>{error}</div>}
+        <TimeWidget onChange={(msg) => { timeMsgRef.current = msg; }} />
       </div>
     </Modal>
   );

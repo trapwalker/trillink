@@ -11,6 +11,8 @@
   "dependencies": {
     "@preact/signals": "^2.2.1",
     "@trillink/audio-web": "workspace:*",
+    "@trillink/coord-parser": "workspace:*",
+    "@trillink/map-providers": "workspace:*",
     "@trillink/protocol": "workspace:*",
     "@trillink/sdk": "workspace:*",
     "idb": "^8.0.3",

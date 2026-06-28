@@ -5,7 +5,7 @@ import { Modal } from '../Modal.js';
 
 interface Props {
   entry:   JournalEntry;
-  onSend:  (msg: TrilinkMessage) => void;
+  onSend:  (msgs: TrilinkMessage[]) => void;
   onClose: () => void;
 }
 
@@ -35,7 +35,7 @@ export function ContactDetailModal({ entry, onSend, onClose }: Props) {
           {callHref  && <a style={s.icon} href={callHref}>📞 Call</a>}
           {emailHref && <a style={s.icon} href={emailHref}>✉️ Email</a>}
           {!isIn && (
-            <button style={s.primary} onClick={() => { onSend(msg); onClose(); }}>▶ Re-send</button>
+            <button style={s.primary} onClick={() => { onSend([msg]); onClose(); }}>▶ Re-send</button>
           )}
         </>
       }
