@@ -42,21 +42,17 @@ function EntryCard({ entry, onSelect }: { entry: JournalEntry; onSelect: (e: Jou
   const msg  = entry.message;
   const dirColor = isIn ? 'var(--accent)' : 'var(--green)';
 
-  function handleRowClick() {
-    if (msg.type === 'GEO') onSelect(entry);
-  }
-
   return (
     <div style={{ ...s.card, borderLeft: `3px solid ${dirColor}` }}>
       <div
-        style={{ ...s.row, cursor: msg.type === 'GEO' ? 'pointer' : 'default' }}
-        onClick={handleRowClick}
+        style={{ ...s.row, cursor: 'pointer' }}
+        onClick={() => onSelect(entry)}
       >
         <span style={{ ...s.dir, color: dirColor }}>{isIn ? '◀' : '▶'}</span>
         <span style={s.time}>{formatTs(entry.ts)}</span>
         <span style={s.type}>{msg.type}</span>
         <span style={s.colon}>:</span>
-        <span style={s.content} title={msg.type === 'GEO' ? 'Open on map' : undefined}>
+        <span style={s.content} title="Open details">
           <ContentText msg={msg} />
         </span>
         <div style={s.actions} onClick={(e) => e.stopPropagation()}>

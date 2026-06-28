@@ -60,20 +60,28 @@ export function addEntry(entry: JournalEntry): void {
 
 // ── Audio / receiver state ────────────────────────────────────────────────────
 
-export const isListening      = signal(false);
-export const audioLevel       = signal(0);
-export const showWaterfall    = signal(true);
-export const panelView        = signal<'waterfall' | 'map'>('waterfall');
-export const isSending        = signal(false);
-export const sendProgress     = signal('');
-export const signalDetected   = signal(false);
+export const isListening    = signal(false);
+export const audioLevel     = signal(0);
+export const isSending      = signal(false);
+export const sendProgress   = signal('');
+export const signalDetected = signal(false);
+
+const WF_KEY  = 'trillink:showwf';
+const MAP_KEY = 'trillink:showmap';
+export const showWaterfall = signal<boolean>(localStorage.getItem(WF_KEY) !== 'false');
+export const showMap       = signal<boolean>(localStorage.getItem(MAP_KEY) === 'true');
+showWaterfall.subscribe((v) => localStorage.setItem(WF_KEY, String(v)));
+showMap.subscribe((v)       => localStorage.setItem(MAP_KEY, String(v)));
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
 export type ModalState =
   | { type: 'none' }
   | { type: 'geo-send' }
-  | { type: 'geo-detail'; entry: JournalEntry }
+  | { type: 'geo-detail';     entry: JournalEntry }
+  | { type: 'text-detail';    entry: JournalEntry }
+  | { type: 'contact-detail'; entry: JournalEntry }
+  | { type: 'time-detail';    entry: JournalEntry }
   | { type: 'contact-send' }
   | { type: 'text-send' }
   | { type: 'time-send' }

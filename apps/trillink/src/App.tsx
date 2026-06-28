@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
 import { WebAudioAdapter } from '@trillink/audio-web';
 import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
@@ -6,19 +6,22 @@ import type { ReceiverEvent } from '@trillink/sdk';
 import {
   addEntry, nextEntryId, isListening, audioLevel, signalDetected,
   isSending, sendProgress, modal, closeModal, openModal, pttEnabled,
-  journal, journalLoaded, toast, showToast, panelView,
+  journal, journalLoaded, toast, showToast, showWaterfall, showMap,
 } from './store/index.js';
-import { Toolbar }          from './components/Toolbar.js';
-import { Journal }          from './components/Journal.js';
-import { StatusBar }        from './components/StatusBar.js';
-import { WaterfallPanel }   from './components/WaterfallPanel.js';
-import { MapPanel }         from './components/MapPanel.js';
-import { GeoSendModal }     from './components/modals/GeoSendModal.js';
-import { GeoDetailModal }   from './components/modals/GeoDetailModal.js';
-import { ContactSendModal } from './components/modals/ContactSendModal.js';
-import { TextSendModal }    from './components/modals/TextSendModal.js';
-import { TimeSendModal }    from './components/modals/TimeSendModal.js';
-import { QrModal }          from './components/modals/QrModal.js';
+import { Toolbar }              from './components/Toolbar.js';
+import { Journal }              from './components/Journal.js';
+import { StatusBar }            from './components/StatusBar.js';
+import { WaterfallPanel }       from './components/WaterfallPanel.js';
+import { MapPanel }             from './components/MapPanel.js';
+import { GeoSendModal }         from './components/modals/GeoSendModal.js';
+import { GeoDetailModal }       from './components/modals/GeoDetailModal.js';
+import { TextDetailModal }      from './components/modals/TextDetailModal.js';
+import { ContactDetailModal }   from './components/modals/ContactDetailModal.js';
+import { TimeDetailModal }      from './components/modals/TimeDetailModal.js';
+import { ContactSendModal }     from './components/modals/ContactSendModal.js';
+import { TextSendModal }        from './components/modals/TextSendModal.js';
+import { TimeSendModal }        from './components/modals/TimeSendModal.js';
+import { QrModal }              from './components/modals/QrModal.js';
 
 export function App() {
   const rxRef       = useRef<TrilinkReceiver | null>(null);
@@ -27,7 +30,10 @@ export function App() {
   const signalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
 
-  // ── Receiver ────────────────────────────────────────────────────────────────
+  const [wfHeight,  setWfHeight]  = useState(120);
+  const [mapHeight, setMapHeight] = useState(200);
+
+  // ── Receiver ─────────────────────────────────────────────────────────────────
 
   async function startListening() {
     try {
@@ -59,7 +65,6 @@ export function App() {
       });
       rxRef.current = rx;
       await rx.start();
-      // analyser is only available after startListening completes (RxHandle is created inside)
       analyserRef.current = adapter.analyser;
     } catch {
       isListening.value = false;
@@ -68,7 +73,7 @@ export function App() {
 
   async function stopListening() {
     await rxRef.current?.stop();
-    rxRef.current      = null;
+    rxRef.current       = null;
     adapterRef.current  = null;
     analyserRef.current = null;
     isListening.value   = false;
@@ -80,13 +85,12 @@ export function App() {
     return () => { void rxRef.current?.stop(); };
   }, []);
 
-  // ── Sender ──────────────────────────────────────────────────────────────────
+  // ── Sender ───────────────────────────────────────────────────────────────────
 
   async function sendMessage(message: TrilinkMessage) {
     closeModal();
     isSending.value = true;
 
-    // Add to journal immediately as outgoing
     addEntry({
       id: nextEntryId(),
       message,
@@ -120,12 +124,20 @@ export function App() {
     }
   }
 
+  function openEntry(entry: import('./store/index.js').JournalEntry) {
+    switch (entry.message.type) {
+      case 'GEO':     openModal({ type: 'geo-detail',     entry }); break;
+      case 'TEXT':    openModal({ type: 'text-detail',    entry }); break;
+      case 'CONTACT': openModal({ type: 'contact-detail', entry }); break;
+      case 'TIME':    openModal({ type: 'time-detail',    entry }); break;
+    }
+  }
+
   // Keyboard: Escape closes modal; Cmd+C copies last journal entry
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { closeModal(); return; }
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
-        // Only intercept when nothing is selected
         if (window.getSelection()?.toString()) return;
         const top = journal.value[0];
         if (!top) return;
@@ -140,51 +152,84 @@ export function App() {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  const m = modal.value;
+  const m      = modal.value;
+  const wfVis  = showWaterfall.value && isListening.value;
+  const mapVis = showMap.value;
 
   return (
     <div style={s.root}>
       <Toolbar onSend={sendMessage} />
-      <WaterfallPanel analyserRef={analyserRef} />
-      {panelView.value === 'map' && (
-        <MapPanel onSelectEntry={(entry) => {
-          if (entry.message.type === 'GEO') openModal({ type: 'geo-detail', entry });
-        }} />
+
+      {wfVis && (
+        <>
+          <WaterfallPanel analyserRef={analyserRef} height={wfHeight} />
+          <ResizeHandle onDrag={(dy) => setWfHeight((h) => clamp(h + dy, 60, 400))} />
+        </>
       )}
+
+      {mapVis && (
+        <>
+          <MapPanel onSelectEntry={openEntry} height={mapHeight} />
+          <ResizeHandle onDrag={(dy) => setMapHeight((h) => clamp(h + dy, 80, 500))} />
+        </>
+      )}
+
       <StatusBar onStartListening={startListening} onStopListening={stopListening} />
-      <Journal
-        loading={!journalLoaded.value}
-        onSelectEntry={(entry) => {
-          if (entry.message.type === 'GEO') openModal({ type: 'geo-detail', entry });
-        }}
-      />
+      <Journal loading={!journalLoaded.value} onSelectEntry={openEntry} />
 
-      {m.type === 'geo-send'     && <GeoSendModal onSend={sendMessage} onClose={closeModal} />}
-      {m.type === 'geo-detail'   && <GeoDetailModal entry={m.entry} onSend={sendMessage} onClose={closeModal} />}
-      {m.type === 'contact-send' && <ContactSendModal onSend={sendMessage} onClose={closeModal} />}
-      {m.type === 'text-send'    && <TextSendModal onSend={sendMessage} onClose={closeModal} />}
-      {m.type === 'time-send'    && <TimeSendModal onSend={sendMessage} onClose={closeModal} />}
-      {m.type === 'qr'           && <QrModal onClose={closeModal} />}
+      {m.type === 'geo-send'      && <GeoSendModal onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'geo-detail'    && <GeoDetailModal entry={m.entry} onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'text-detail'   && <TextDetailModal entry={m.entry} onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'contact-detail' && <ContactDetailModal entry={m.entry} onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'time-detail'   && <TimeDetailModal entry={m.entry} onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'contact-send'  && <ContactSendModal onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'text-send'     && <TextSendModal onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'time-send'     && <TimeSendModal onSend={sendMessage} onClose={closeModal} />}
+      {m.type === 'qr'            && <QrModal onClose={closeModal} />}
 
-      {toast.value && (
-        <div style={s.toast}>{toast.value}</div>
-      )}
+      {toast.value && <div style={s.toast}>{toast.value}</div>}
+    </div>
+  );
+}
+
+function clamp(v: number, min: number, max: number) { return Math.max(min, Math.min(max, v)); }
+
+function ResizeHandle({ onDrag }: { onDrag: (dy: number) => void }) {
+  function onMouseDown(e: MouseEvent) {
+    e.preventDefault();
+    let lastY = e.clientY;
+    function onMove(e: MouseEvent) { const dy = e.clientY - lastY; lastY = e.clientY; onDrag(dy); }
+    function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+  function onTouchStart(e: TouchEvent) {
+    e.preventDefault();
+    let lastY = e.touches[0].clientY;
+    function onMove(e: TouchEvent) { const dy = e.touches[0].clientY - lastY; lastY = e.touches[0].clientY; onDrag(dy); }
+    function onEnd() { document.removeEventListener('touchmove', onMove as EventListener); document.removeEventListener('touchend', onEnd); }
+    document.addEventListener('touchmove', onMove as EventListener, { passive: false });
+    document.addEventListener('touchend', onEnd);
+  }
+  return (
+    <div
+      style={s.handle}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
+      title="Drag to resize"
+    >
+      <span style={s.handleGrip}>⋯</span>
     </div>
   );
 }
 
 function formatMessageForClipboard(msg: TrilinkMessage): string {
   switch (msg.type) {
-    case 'GEO':
-      return `${msg.lat.toFixed(6)}, ${msg.lon.toFixed(6)}${msg.alt !== undefined ? ` alt:${msg.alt}m` : ''}`;
-    case 'CONTACT':
-      return msg.value;
-    case 'TEXT':
-      return msg.text;
-    case 'TIME':
-      return new Date(msg.unixTs * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-    default:
-      return msg.type;
+    case 'GEO':     return `${msg.lat.toFixed(6)}, ${msg.lon.toFixed(6)}${msg.alt !== undefined ? ` alt:${msg.alt}m` : ''}`;
+    case 'CONTACT': return msg.value;
+    case 'TEXT':    return msg.text;
+    case 'TIME':    return new Date(msg.unixTs * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    default:        return msg.type;
   }
 }
 
@@ -196,6 +241,23 @@ const s = {
     maxWidth: '720px',
     margin: '0 auto',
     overflow: 'hidden',
+  },
+  handle: {
+    height: '6px',
+    background: 'var(--border)',
+    cursor: 'ns-resize',
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    userSelect: 'none' as const,
+  },
+  handleGrip: {
+    fontSize: '8px',
+    color: 'var(--muted)',
+    lineHeight: 1,
+    pointerEvents: 'none' as const,
+    letterSpacing: '2px',
   },
   toast: {
     position: 'fixed' as const,

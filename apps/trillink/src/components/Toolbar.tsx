@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import type { TrilinkMessage } from '@trillink/protocol';
-import { openModal, pttEnabled, isSending, showWaterfall, panelView } from '../store/index.js';
+import { openModal, pttEnabled, isSending, showWaterfall, showMap } from '../store/index.js';
 
 interface Props {
   onSend: (msg: TrilinkMessage) => void;
@@ -43,20 +43,15 @@ export function Toolbar({ onSend: _onSend }: Props) {
 
 function Menu() {
   const [open, setOpen] = useState(false);
-  const ptt  = pttEnabled.value;
-  const view = panelView.value;
-  const wf   = showWaterfall.value;
+  const ptt = pttEnabled.value;
+  const wf  = showWaterfall.value;
+  const mp  = showMap.value;
 
   function close() { setOpen(false); }
 
   return (
     <div style={s.menuWrap}>
-      <button
-        style={s.iconBtn}
-        title="Menu"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Open menu"
-      >
+      <button style={s.iconBtn} title="Menu" onClick={() => setOpen((v) => !v)} aria-label="Open menu">
         ☰
       </button>
 
@@ -65,45 +60,20 @@ function Menu() {
           <div style={s.backdrop} onClick={close} />
           <div style={s.dropdown}>
 
-            {/* Panel view */}
+            {/* Panels */}
             <div style={s.section}>
-              <div style={s.sectionLabel}>Panel</div>
-              <div style={s.segRow}>
-                <button
-                  style={{ ...s.seg, ...(view === 'waterfall' ? s.segActive : {}) }}
-                  onClick={() => { panelView.value = 'waterfall'; showWaterfall.value = true; close(); }}
-                >
-                  ≋ Waterfall
-                </button>
-                <button
-                  style={{ ...s.seg, ...(view === 'map' ? s.segActive : {}) }}
-                  onClick={() => { panelView.value = 'map'; close(); }}
-                >
-                  🗺 Map
-                </button>
-              </div>
+              <div style={s.sectionLabel}>Panels</div>
+              <ToggleRow label="≋ Waterfall" active={wf} onToggle={() => { showWaterfall.value = !wf; }} />
+              <ToggleRow label="🗺 Map" active={mp} onToggle={() => { showMap.value = !mp; }} />
             </div>
 
             <div style={s.divider} />
 
             {/* PTT */}
-            <button style={s.item} onClick={() => { pttEnabled.value = !ptt; }}>
-              <span>📡 PTT mode</span>
-              <span style={{ color: ptt ? 'var(--green)' : 'var(--muted)', fontSize: '11px', fontWeight: 700 }}>
-                {ptt ? 'ON' : 'OFF'}
-              </span>
-            </button>
-
-            {/* Waterfall toggle (only relevant in waterfall mode) */}
-            {view === 'waterfall' && (
-              <button style={s.item} onClick={() => { showWaterfall.value = !wf; close(); }}>
-                <span>{wf ? 'Hide waterfall' : 'Show waterfall'}</span>
-              </button>
-            )}
+            <ToggleRow label="📡 PTT mode" active={ptt} onToggle={() => { pttEnabled.value = !ptt; }} />
 
             <div style={s.divider} />
 
-            {/* QR code */}
             <button style={s.item} onClick={() => { openModal({ type: 'qr' }); close(); }}>
               ⊞ QR code (this page)
             </button>
@@ -111,6 +81,20 @@ function Menu() {
         </>
       )}
     </div>
+  );
+}
+
+function ToggleRow({ label, active, onToggle }: { label: string; active: boolean; onToggle: () => void }) {
+  return (
+    <button style={s.item} onClick={onToggle}>
+      <span>{label}</span>
+      <span style={{
+        fontSize: '10px', fontWeight: 700, letterSpacing: '0.04em',
+        color: active ? 'var(--green)' : 'var(--muted)',
+      }}>
+        {active ? 'ON' : 'OFF'}
+      </span>
+    </button>
   );
 }
 
@@ -179,20 +163,6 @@ const s = {
   },
   section: { padding: '2px 0 4px' },
   sectionLabel: { fontSize: '10px', color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.08em', padding: '0 6px 4px', textTransform: 'uppercase' as const },
-  segRow: { display: 'flex', gap: '4px' },
-  seg: {
-    flex: 1,
-    background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: '6px',
-    color: 'var(--muted)',
-    cursor: 'pointer',
-    fontSize: '12px',
-    fontWeight: 500,
-    padding: '6px 8px',
-    textAlign: 'center' as const,
-  },
-  segActive: { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-dim)' },
   item: {
     background: 'none',
     border: 'none',
