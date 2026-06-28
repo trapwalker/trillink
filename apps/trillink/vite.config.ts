@@ -1,4 +1,5 @@
 import preact from '@preact/preset-vite';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
@@ -22,11 +23,12 @@ function listenLinkPlugin(): Plugin {
         const addr = server.httpServer?.address();
         const port = typeof addr === 'object' && addr ? addr.port : 5173;
         const lanIp  = getLanIp();
-        const lanUrl = lanIp ? `http://${lanIp}:${port}` : null;
+        const lanUrl = lanIp ? `https://${lanIp}:${port}` : null;
 
-        console.log(`\n  \x1b[36m▶◀ trillink:\x1b[0m \x1b[4mhttp://localhost:${port}\x1b[0m`);
+        console.log(`\n  \x1b[36m▶◀ trillink:\x1b[0m \x1b[4mhttps://localhost:${port}\x1b[0m`);
         if (lanUrl) {
           console.log(`  \x1b[36mNetwork:\x1b[0m        \x1b[4m${lanUrl}\x1b[0m`);
+          console.log(`  \x1b[33m⚠ Self-signed cert — accept it in the browser on first visit\x1b[0m`);
           try {
             const { default: QRCode } = await import('qrcode') as { default: typeof import('qrcode') };
             const qr = await QRCode.toString(lanUrl, { type: 'terminal', small: true, errorCorrectionLevel: 'L' });
@@ -43,6 +45,7 @@ const root = fileURLToPath(new URL('../..', import.meta.url));
 
 export default defineConfig({
   plugins: [
+    basicSsl(),
     preact(),
     VitePWA({
       registerType: 'autoUpdate',

@@ -1,4 +1,4 @@
-import { isListening, audioLevel, signalDetected, isSending, sendProgress, showWaterfall } from '../store/index.js';
+import { isListening, listenError, audioLevel, signalDetected, isSending, sendProgress, showWaterfall } from '../store/index.js';
 
 interface Props {
   onStartListening: () => void;
@@ -7,6 +7,7 @@ interface Props {
 
 export function StatusBar({ onStartListening, onStopListening }: Props) {
   const listening = isListening.value;
+  const error     = listenError.value;
   const level     = audioLevel.value;
   const signal    = signalDetected.value;
   const sending   = isSending.value;
@@ -46,8 +47,10 @@ export function StatusBar({ onStartListening, onStopListening }: Props) {
           </div>
           {signal && <span style={s.signalLabel}>Signal…</span>}
         </div>
+      ) : error ? (
+        <span style={s.error} title={error}>⚠ {error}</span>
       ) : (
-        <span style={s.idle}>Not listening</span>
+        <span style={s.idle}>Tap ◉ to listen</span>
       )}
 
       {sending && (
@@ -97,7 +100,8 @@ const s = {
   },
   vuBar: { height: '100%', borderRadius: '3px', transition: 'width 40ms linear, background 100ms' },
   signalLabel: { fontSize: '12px', color: 'var(--green)', fontWeight: 600 },
-  idle: { fontSize: '13px', color: 'var(--muted)' },
+  idle:  { fontSize: '13px', color: 'var(--muted)' },
+  error: { fontSize: '12px', color: 'var(--red)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
   sendStatus: { display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' },
   sendDot: { color: 'var(--accent)', animation: 'pulse 0.8s infinite' },
   sendLabel: { fontSize: '12px', color: 'var(--muted)' },

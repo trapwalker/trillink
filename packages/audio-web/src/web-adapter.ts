@@ -14,6 +14,9 @@ export interface WebAudioAdapterOptions {
   /** PTT/walkie-talkie: play a carrier tone before each cycle to open squelch */
   ptt?: boolean;
   volume?: number;
+  /** Pre-created AudioContext — pass one created synchronously inside a user-gesture
+   *  handler to guarantee it starts in 'running' state (avoids Chrome autoplay suspension). */
+  ctx?: AudioContext;
 }
 
 function resolveCodec(spec: CodecSpec, amplitude: number): AudioCodec {
@@ -35,6 +38,7 @@ export class WebAudioAdapter implements AudioAdapter {
     const amplitude = (opts.volume ?? 60) / 100;
     this.codec = resolveCodec(opts.codec ?? 'dtmf-fsk', amplitude);
     this.defaultPreambleMs = opts.ptt ? 700 : 0;
+    if (opts.ctx) this._ctx = opts.ctx;
   }
 
   get isListening(): boolean { return this._rxHandle !== null; }

@@ -4,7 +4,7 @@ import { WebAudioAdapter } from '@trillink/audio-web';
 import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 import {
-  addEntry, nextEntryId, isListening, audioLevel, signalDetected,
+  addEntry, nextEntryId, isListening, listenError, audioLevel, signalDetected,
   isSending, sendProgress, modal, closeModal, openModal, pttEnabled,
   journal, journalLoaded, toast, showToast, showWaterfall, showMap,
   type JournalEntry,
@@ -36,8 +36,14 @@ export function App() {
   // ── Receiver ─────────────────────────────────────────────────────────────────
 
   async function startListening() {
+    listenError.value = '';
     try {
-      const adapter = new WebAudioAdapter();
+      // AudioContext must be created synchronously inside a user-gesture handler.
+      // We prime it here so that even the async getUserMedia flow runs with a
+      // 'running' context (avoids Chrome autoplay suspension).
+      const ctx = new AudioContext();
+
+      const adapter = new WebAudioAdapter({ ctx });
       adapterRef.current = adapter;
 
       const rx = new TrilinkReceiver({
@@ -69,9 +75,17 @@ export function App() {
     } catch (err) {
       console.error('[startListening]', err);
       isListening.value = false;
-      showToast(err instanceof DOMException && err.name === 'NotAllowedError'
-        ? 'Microphone access denied'
-        : 'Failed to start microphone');
+      if (err instanceof DOMException) {
+        if (err.name === 'NotAllowedError') {
+          listenError.value = 'Microphone access denied — check browser and system settings';
+        } else if (err.name === 'NotFoundError') {
+          listenError.value = 'No microphone found';
+        } else {
+          listenError.value = `Mic error: ${err.message}`;
+        }
+      } else {
+        listenError.value = `Failed to start: ${String(err)}`;
+      }
     }
   }
 
@@ -85,6 +99,8 @@ export function App() {
   }
 
   useEffect(() => {
+    // Auto-start; if mic is denied or AudioContext blocked, listenError shows
+    // a persistent banner so the user knows to click ◉ to retry.
     void startListening();
     return () => { void rxRef.current?.stop(); };
   }, []);
