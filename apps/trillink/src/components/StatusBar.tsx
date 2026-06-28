@@ -1,4 +1,5 @@
-import { isListening, listenError, audioLevel, signalDetected, isSending, sendProgress, showWaterfall } from '../store/index.js';
+import { isListening, listenError, debugCapture, audioLevel, signalDetected, isSending, sendProgress, showWaterfall } from '../store/index.js';
+import { downloadBlob } from '../utils/wav.js';
 
 interface Props {
   onStartListening: () => void;
@@ -8,6 +9,7 @@ interface Props {
 export function StatusBar({ onStartListening, onStopListening }: Props) {
   const listening = isListening.value;
   const error     = listenError.value;
+  const capture   = debugCapture.value;
   const level     = audioLevel.value;
   const signal    = signalDetected.value;
   const sending   = isSending.value;
@@ -60,6 +62,19 @@ export function StatusBar({ onStartListening, onStopListening }: Props) {
         </div>
       )}
 
+      {capture && (
+        <button
+          style={s.debugBtn}
+          title={`Download ${capture.name}`}
+          onClick={() => {
+            downloadBlob(capture.blob, capture.name);
+            debugCapture.value = null;
+          }}
+        >
+          📥 debug audio
+        </button>
+      )}
+
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }`}</style>
     </div>
   );
@@ -102,6 +117,12 @@ const s = {
   signalLabel: { fontSize: '12px', color: 'var(--green)', fontWeight: 600 },
   idle:  { fontSize: '13px', color: 'var(--muted)' },
   error: { fontSize: '12px', color: 'var(--red)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
+  debugBtn: {
+    marginLeft: 'auto', flexShrink: 0,
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)', color: 'var(--muted)',
+    cursor: 'pointer', fontSize: '11px', padding: '3px 8px',
+  },
   sendStatus: { display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' },
   sendDot: { color: 'var(--accent)', animation: 'pulse 0.8s infinite' },
   sendLabel: { fontSize: '12px', color: 'var(--muted)' },

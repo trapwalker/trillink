@@ -4,11 +4,12 @@ import { WebAudioAdapter } from '@trillink/audio-web';
 import { TrilinkSender, TrilinkReceiver } from '@trillink/sdk';
 import type { ReceiverEvent } from '@trillink/sdk';
 import {
-  addEntry, nextEntryId, isListening, listenError, audioLevel, signalDetected,
+  addEntry, nextEntryId, isListening, listenError, debugCapture, audioLevel, signalDetected,
   isSending, sendProgress, modal, closeModal, openModal, pttEnabled,
   journal, journalLoaded, toast, showToast, showWaterfall, showMap,
   type JournalEntry,
 } from './store/index.js';
+import { encodeWav } from './utils/wav.js';
 import { Toolbar }              from './components/Toolbar.js';
 import { Journal }              from './components/Journal.js';
 import { StatusBar }            from './components/StatusBar.js';
@@ -43,7 +44,16 @@ export function App() {
       // 'running' context (avoids Chrome autoplay suspension).
       const ctx = new AudioContext();
 
-      const adapter = new WebAudioAdapter({ ctx });
+      const adapter = new WebAudioAdapter({
+        ctx,
+        onDecodeError: (_rawBytes) => {
+          const cap = adapter.getCapture();
+          if (!cap) return;
+          const blob = encodeWav(cap.samples, cap.sampleRate);
+          const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          debugCapture.value = { blob, name: `trillink-debug-${ts}.wav` };
+        },
+      });
       adapterRef.current = adapter;
 
       const rx = new TrilinkReceiver({

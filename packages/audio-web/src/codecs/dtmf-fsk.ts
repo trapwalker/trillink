@@ -95,10 +95,10 @@ export class DtmfFskCodec implements AudioCodec {
     }, 1e-6);  // real-world acoustic path: signal is ~1e-6–1e-5 energy (≈ −50 dBFS)
 
     proc.onaudioprocess = (e: AudioProcessingEvent) => {
-      const chunk = e.inputBuffer.getChannelData(0);
-      decoder.process(new Float32Array(chunk));
+      const chunk = new Float32Array(e.inputBuffer.getChannelData(0));
+      decoder.process(chunk);
+      handlers.onSamples?.(chunk);
 
-      // Level for VU meter
       if (handlers.onLevel) {
         let sum = 0;
         for (const s of chunk) sum += s * s;

@@ -28,15 +28,12 @@ export interface TxHandle {
 
 export interface RxHandlers {
   onStart?: () => void;
-  /**
-   * Called after each received byte. Return true to immediately declare the
-   * buffer complete — lets the protocol layer signal "frame is done" without
-   * the codec needing to know the frame format.
-   */
   onProgress?: (buffer: Uint8Array, elapsedSec: number) => boolean | void;
   onEnd?: (buffer: Uint8Array, elapsedSec: number) => void;
   onLevel?: (rms: number) => void;
   onError?: (reason: 'framing' | 'timeout' | 'noise') => void;
+  /** Raw PCM chunk from onaudioprocess — used to fill the ring buffer. */
+  onSamples?: (chunk: Float32Array) => void;
 }
 
 export interface RxHandle {

@@ -62,6 +62,7 @@ export function addEntry(entry: JournalEntry): void {
 
 export const isListening    = signal(false);
 export const listenError    = signal('');   // persistent; cleared on successful start
+export const debugCapture   = signal<{ blob: Blob; name: string } | null>(null);
 export const audioLevel     = signal(0);
 export const isSending      = signal(false);
 export const sendProgress   = signal('');

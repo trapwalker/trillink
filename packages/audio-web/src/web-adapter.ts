@@ -17,12 +17,17 @@ export interface WebAudioAdapterOptions {
   /** Pre-created AudioContext — pass one created synchronously inside a user-gesture
    *  handler to guarantee it starts in 'running' state (avoids Chrome autoplay suspension). */
   ctx?: AudioContext;
+  /** Called when bytes arrive from the decoder but CRC / framing validation fails.
+   *  Use with getCapture() to retrieve the raw audio for debugging. */
+  onDecodeError?: (rawBytes: Uint8Array) => void;
 }
 
 function resolveCodec(spec: CodecSpec, amplitude: number): AudioCodec {
   if (typeof spec === 'object') return spec;
   return new DtmfFskCodec({ amplitude });
 }
+
+const RING_SECS = 45;
 
 export class WebAudioAdapter implements AudioAdapter {
   private _ctx: AudioContext | null = null;
@@ -33,12 +38,34 @@ export class WebAudioAdapter implements AudioAdapter {
 
   private readonly codec: AudioCodec;
   private readonly defaultPreambleMs: number;
+  private readonly onDecodeError: ((raw: Uint8Array) => void) | undefined;
+
+  // Ring buffer — always filled while listening; enables post-hoc debug capture
+  private _ring: Float32Array | null = null;
+  private _ringPos = 0;
+  private _ringRate = 48000;
 
   constructor(opts: WebAudioAdapterOptions = {}) {
     const amplitude = (opts.volume ?? 60) / 100;
     this.codec = resolveCodec(opts.codec ?? 'dtmf-fsk', amplitude);
     this.defaultPreambleMs = opts.ptt ? 700 : 0;
+    this.onDecodeError = opts.onDecodeError;
     if (opts.ctx) this._ctx = opts.ctx;
+  }
+
+  /**
+   * Return the last `durationSec` seconds of microphone audio as a linear PCM
+   * Float32Array at the AudioContext sample rate.  Returns null before listening starts.
+   */
+  getCapture(durationSec = RING_SECS): { samples: Float32Array; sampleRate: number } | null {
+    if (!this._ring) return null;
+    const n = Math.min(Math.round(this._ringRate * durationSec), this._ring.length);
+    const out = new Float32Array(n);
+    const start = ((this._ringPos - n) + this._ring.length) % this._ring.length;
+    for (let i = 0; i < n; i++) {
+      out[i] = this._ring[(start + i) % this._ring.length]!;
+    }
+    return { samples: out, sampleRate: this._ringRate };
   }
 
   get isListening(): boolean { return this._rxHandle !== null; }
@@ -102,12 +129,29 @@ export class WebAudioAdapter implements AudioAdapter {
     const ctx = this.getOrCreateContext();
     if (ctx.state === 'suspended') await ctx.resume();
 
+    // Allocate ring buffer now that we know the sample rate
+    this._ringRate = ctx.sampleRate;
+    this._ring    = new Float32Array(Math.round(ctx.sampleRate * RING_SECS));
+    this._ringPos = 0;
+
+    const fillRing = (chunk: Float32Array) => {
+      for (let i = 0; i < chunk.length; i++) {
+        this._ring![this._ringPos] = chunk[i]!;
+        this._ringPos = (this._ringPos + 1) % this._ring!.length;
+      }
+    };
+
     this._rxHandle = await this.codec.startReceiving(ctx, this._stream, {
       ...(onSignal !== undefined && { onStart: onSignal }),
       onEnd: (bytes) => {
-        try { onFrame(decodeFrame(bytes)); } catch { /* CRC / framing error */ }
+        try {
+          onFrame(decodeFrame(bytes));
+        } catch {
+          this.onDecodeError?.(bytes);
+        }
       },
       ...(onLevel !== undefined && { onLevel }),
+      onSamples: fillRing,
     });
   }
 
@@ -116,5 +160,7 @@ export class WebAudioAdapter implements AudioAdapter {
     this._rxHandle = null;
     this._stream?.getTracks().forEach((t) => t.stop());
     this._stream = null;
+    this._ring    = null;
+    this._ringPos = 0;
   }
 }
