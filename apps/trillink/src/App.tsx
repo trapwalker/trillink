@@ -7,6 +7,7 @@ import {
   addEntry, nextEntryId, isListening, audioLevel, signalDetected,
   isSending, sendProgress, modal, closeModal, openModal, pttEnabled,
   journal, journalLoaded, toast, showToast, showWaterfall, showMap,
+  type JournalEntry,
 } from './store/index.js';
 import { Toolbar }              from './components/Toolbar.js';
 import { Journal }              from './components/Journal.js';
@@ -95,17 +96,27 @@ export function App() {
     isSending.value = true;
 
     const now = new Date();
-    for (const message of messages) {
-      addEntry({
+    const [primary, ...extras] = messages;
+
+    // Group all messages from one send action into a single journal entry
+    const entry: JournalEntry = {
+      id: nextEntryId(),
+      message: primary!,
+      direction: 'out',
+      sessionId: 0,
+      isCont: false,
+      ts: now,
+      continuations: extras.map((message) => ({
         id: nextEntryId(),
         message,
-        direction: 'out',
+        direction: 'out' as const,
         sessionId: 0,
-        isCont: false,
+        isCont: true,
         ts: now,
         continuations: [],
-      });
-    }
+      })),
+    };
+    addEntry(entry);
 
     try {
       const adapter = new WebAudioAdapter({ ptt: pttEnabled.value, volume: 60 });
@@ -124,14 +135,15 @@ export function App() {
         },
       });
       senderRef.current = sender;
-      await sender.send(messages.map((message) => ({ message })));
+      // Secondary messages marked cont:true so receiver groups them under the primary
+      await sender.send(messages.map((message, i) => ({ message, cont: i > 0 })));
     } catch (err) {
       console.error('[sendMessage]', err);
       isSending.value = false;
     }
   }
 
-  function openEntry(entry: import('./store/index.js').JournalEntry) {
+  function openEntry(entry: JournalEntry) {
     switch (entry.message.type) {
       case 'GEO':     openModal({ type: 'geo-detail',     entry }); break;
       case 'TEXT':    openModal({ type: 'text-detail',    entry }); break;

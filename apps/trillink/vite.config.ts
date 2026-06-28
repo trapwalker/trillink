@@ -1,18 +1,39 @@
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
+
+function getLanIp(): string | null {
+  for (const ifaces of Object.values(os.networkInterfaces())) {
+    for (const iface of ifaces ?? []) {
+      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+    }
+  }
+  return null;
+}
 
 function listenLinkPlugin(): Plugin {
   return {
     name: 'trillink-listen-link',
     configureServer(server) {
-      server.httpServer?.once('listening', () => {
+      server.httpServer?.once('listening', async () => {
         const addr = server.httpServer?.address();
         const port = typeof addr === 'object' && addr ? addr.port : 5173;
-        const url = `http://localhost:${port}`;
-        console.log(`\n  \x1b[36m▶◀ trillink:\x1b[0m \x1b[4m${url}\x1b[0m\n`);
+        const lanIp  = getLanIp();
+        const lanUrl = lanIp ? `http://${lanIp}:${port}` : null;
+
+        console.log(`\n  \x1b[36m▶◀ trillink:\x1b[0m \x1b[4mhttp://localhost:${port}\x1b[0m`);
+        if (lanUrl) {
+          console.log(`  \x1b[36mNetwork:\x1b[0m        \x1b[4m${lanUrl}\x1b[0m`);
+          try {
+            const { default: QRCode } = await import('qrcode') as { default: typeof import('qrcode') };
+            const qr = await QRCode.toString(lanUrl, { type: 'terminal', small: true, errorCorrectionLevel: 'L' });
+            console.log(qr);
+          } catch { /* qrcode unavailable */ }
+        }
+        console.log();
       });
     },
   };
