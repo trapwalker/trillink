@@ -2,9 +2,20 @@ import preact from '@preact/preset-vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import os from 'node:os';
 import type { Plugin, UserConfig } from 'vite';
 import { defineConfig } from 'vite';
+
+function getAppVersion(): string {
+  try {
+    const sha  = execSync('git rev-parse --short HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+    return `${date}-${sha}`;
+  } catch {
+    return 'dev';
+  }
+}
 
 function getLanIp(): string | null {
   for (const ifaces of Object.values(os.networkInterfaces())) {
@@ -100,6 +111,9 @@ export default defineConfig(({ command }): UserConfig => {
         '@trillink/coord-parser':  `${root}/packages/coord-parser/src/index.ts`,
         '@trillink/map-providers': `${root}/packages/map-providers/src/index.ts`,
       },
+    },
+    define: {
+      __APP_VERSION__: JSON.stringify(process.env.VITE_APP_VERSION ?? getAppVersion()),
     },
     build: {
       target: 'es2022',

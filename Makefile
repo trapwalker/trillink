@@ -1,4 +1,4 @@
-.PHONY: dev stop restart logs
+.PHONY: dev stop restart logs release
 
 APP     = apps/trillink
 LOG     = $(APP)/.dev.log
@@ -30,3 +30,13 @@ restart: stop dev
 # ── logs ─────────────────────────────────────────────────────────────────────
 logs:
 	tail -F -n20 $(LOG)
+
+# ── release ───────────────────────────────────────────────────────────────────
+release:
+	@if [ -n "$$(git status --porcelain)" ]; then \
+	  echo "  ✗ Uncommitted changes — commit first"; exit 1; \
+	fi
+	@echo "  Pushing to main → GitHub Actions will build and deploy…"
+	@git push origin main
+	@REPO=$$(git remote get-url origin 2>/dev/null | sed 's|.*github\.com[/:]||;s|\.git$$||'); \
+	 [ -n "$$REPO" ] && echo "  ✓ https://github.com/$$REPO/actions" || echo "  ✓ Done"

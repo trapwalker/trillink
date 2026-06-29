@@ -82,6 +82,9 @@ function Menu() {
             <button style={s.item} onClick={() => { openModal({ type: 'qr' }); close(); }}>
               ⊞ QR code (this page)
             </button>
+
+            <div style={s.divider} />
+            <div style={s.versionRow}>{__APP_VERSION__}</div>
           </div>
         </>
       )}
@@ -183,4 +186,8 @@ const s = {
     width: '100%',
   },
   divider: { height: '1px', background: 'var(--border)', margin: '2px 0' },
+  versionRow: {
+    fontSize: '10px', color: 'var(--muted)', fontFamily: 'var(--font)',
+    padding: '4px 10px 2px', opacity: 0.6, letterSpacing: '0.04em',
+  },
 } as const;
