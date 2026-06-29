@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Trillink — transmit structured messages over any voice channel" />
+    <meta name="theme-color" content="#0f1117" />
+    <link rel="icon" type="image/svg+xml" href="/trillink/icon.svg" />
+    <link rel="apple-touch-icon" href="/trillink/pwa-192x192.png" />
+    <title>Trillink</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      :root {
+        --bg:         #0f1117;
+        --surface:    #1a1d2e;
+        --border:     #2d3055;
+        --accent:     #4f8ef7;
+        --accent-dim: #1e3a6e;
+        --green:      #3ddc84;
+        --red:        #ff5c5c;
+        --text:       #e2e4f0;
+        --muted:      #6b7094;
+        --radius:     8px;
+        --font:       'SF Mono', 'Fira Code', 'Fira Mono', monospace;
+      }
+      html, body { height: 100%; overflow: hidden; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #app { display: contents; }
+      /* Leaflet dark theme adjustments */
+      .leaflet-container { background: #1a1d2e; }
+      .leaflet-control-attribution { background: rgba(26,29,46,0.8) !important; color: var(--muted) !important; }
+      .leaflet-control-attribution a { color: var(--accent) !important; }
+      /* Secondary markers (history points) */
+      .leaflet-marker-icon.trillink-secondary { opacity: 0.5; filter: hue-rotate(120deg); }
+      /* Icon-only toolbar buttons on narrow screens */
+      @media (max-width: 600px) { .action-label { display: none; } }
+    </style>
+    <script type="module" crossorigin src="/trillink/assets/index-Ckc0r0dS.js"></script>
+  <link rel="manifest" href="/trillink/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/trillink/registerSW.js"></script></head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
